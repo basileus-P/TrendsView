@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Stocks + Google Trends Dashboard</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background:#0b0f14; color:#e6eef7; }
+    header { padding: 24px 20px; border-bottom: 1px solid #1c2633; }
+    h1 { margin: 0; font-size: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 16px; }
+    .card { background:#111826; border:1px solid #1c2633; border-radius:14px; padding:12px; }
+    .card h2 { font-size:14px; margin: 0 0 8px 0; color:#9fb3c8; font-weight:600; letter-spacing:.2px; }
+    .embed { height: 360px; }
+    .tv { height: 420px; }
+    .note { font-size:12px; color:#9fb3c8; padding: 0 16px 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Watchlist & Interest (Google Trends + Live Charts)</h1>
+  </header>
+
+  <!-- STOCK CHARTS (TradingView) -->
+  <div class="grid" id="stocks">
+    <div class="card">
+      <h2>MVIS — Price & mini chart</h2>
+      <div class="embed tv">
+        <!-- TradingView Symbol Overview widget -->
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+          {
+            "symbols": [["NASDAQ:MVIS|1D"]],
+            "chartOnly": false,
+            "width": "100%",
+            "height": "100%",
+            "locale": "en",
+            "autosize": true,
+            "dateRange": "12M",
+            "showVolume": true,
+            "showMA": true
+          }
+          </script>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>QSI — Price & mini chart</h2>
+      <div class="embed tv">
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+          {
+            "symbols": [["NASDAQ:QSI|1D"]],
+            "width": "100%",
+            "height": "100%",
+            "locale": "en",
+            "autosize": true,
+            "dateRange": "12M",
+            "showVolume": true,
+            "showMA": true
+          }
+          </script>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>REKR — Price & mini chart</h2>
+      <div class="embed tv">
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+          {
+            "symbols": [["NASDAQ:REKR|1D"]],
+            "width": "100%",
+            "height": "100%",
+            "locale": "en",
+            "autosize": true,
+            "dateRange": "12M",
+            "showVolume": true,
+            "showMA": true
+          }
+          </script>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GOOGLE TRENDS (multiple widgets on one page) -->
+  <div class="grid" id="trends">
+    <div class="card">
+      <h2>Google Trends — “Microvision” (5y, Worldwide)</h2>
+      <div id="trend-mvis" class="embed"></div>
+    </div>
+    <div class="card">
+      <h2>Google Trends — “Quantum-Si” (5y, Worldwide)</h2>
+      <div id="trend-qsi" class="embed"></div>
+    </div>
+    <div class="card">
+      <h2>Google Trends — “Rekor Systems” (5y, US)</h2>
+      <div id="trend-rekr" class="embed"></div>
+    </div>
+  </div>
+
+  <div class="note">
+    Tip: replace keywords, regions, time ranges, and add/remove cards as needed.
+  </div>
+
+  <!-- Load Google Trends embed script ONCE and render multiple charts -->
+  <script type="text/javascript" src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
+  <script>
+    // Helper to render a Trends widget
+    function renderTrends(targetId, keyword, geo, time) {
+      trends.embed.renderExploreWidget(
+        "TIMESERIES",
+        {
+          "comparisonItem": [{ "keyword": keyword, "geo": geo, "time": time }],
+          "category": 0,
+          "property": ""
+        },
+        {
+          "exploreQuery": "q=" + encodeURIComponent(keyword) + "&geo=" + geo + "&date=" + encodeURIComponent(time),
+          "guestPath": "https://trends.google.com:443/trends/embed/"
+        },
+        document.getElementById(targetId)
+      );
+    }
+
+    // Render your keywords (edit these)
+    renderTrends("trend-mvis", "MicroVision", "", "today 5-y");     // Worldwide, 5 years
+    renderTrends("trend-qsi", "Quantum-Si", "", "today 5-y");
+    renderTrends("trend-rekr", "Rekor Systems", "US", "today 5-y"); // US only
+  </script>
+</body>
+</html>
