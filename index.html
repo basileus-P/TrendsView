@@ -103,9 +103,14 @@
     // Helper: render a Google Trends time series into a container
     function renderTrends(container, keyword) {
       // Use Google Trends official embed loader
-      trends.embed.renderExploreWidget(
+      // IMPORTANT: target a specific container using renderExploreWidgetTo
+      trends.embed.renderExploreWidgetTo(
+        container,
         'TIMESERIES',
         { comparisonItem: [{ keyword, geo: TRENDS_GEO, time: TRENDS_TIME }], category: 0, property: '' },
+        { exploreQuery: `q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath: 'https://trends.google.com:443/trends/embed/' }
+      );
+    }], category: 0, property: '' },
         { exploreQuery: `q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath: 'https://trends.google.com:443/trends/embed/' },
         container
       );
