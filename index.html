@@ -16,12 +16,14 @@
     .chart{height:400px}
     .trend{height:360px}
     .placeholder{height:120px;display:grid;place-items:center;color:var(--muted);border:1px dashed var(--border);border-radius:12px;background:transparent}
+    table{color:var(--text)}
+    th,td{border-color:var(--border)}
     @media (max-width:980px){.container{grid-template-columns:1fr}.chart,.trend{height:300px}}
   </style>
 </head>
 <body>
   <header>
-    <h1>Watchlist — Stocks (left) • Google Trends (middle) • Future data (right)</h1>
+    <h1>Watchlist — Stocks (left) • Google Trends (middle) • Breakout Radar (right)</h1>
   </header>
 
   <div id="grid" class="container"></div>
@@ -39,6 +41,21 @@
     ];
     const TRENDS_GEO = "";            // "" = Worldwide
     const TRENDS_TIME = "today 3-m";  // last 3 months
+
+    // Breakout radar settings (Right column)
+    const BENCHMARK = "QQQ";         // used for short-term RS calc (10 trading days)
+    const RS_LOOKBACK = 10;           // days
+    const AVG_VOL_WINDOW = 20;        // sessions
+    const HIGH_LOOKBACK = 30;         // sessions for near-high check
+    const MA50_WINDOW = 50;
+    const MA200_WINDOW = 200;
+
+    // Thresholds for green checks
+    const THRESHOLDS = {
+      volVsAvg: 2.0,              // >=200%
+      nearHighPct: -0.05,         // within 5% of 30d high (price/high - 1)
+      rsOutperformance: 0.02      // +2% vs benchmark over RS_LOOKBACK
+    };
 
     /* =============================
        HELPERS
@@ -74,35 +91,110 @@
           return;
         }
         if (window.trends && trends.embed && typeof trends.embed.renderExploreWidget==='function'){
-          // Fallback: render to body, then move the last inserted widget into our container
-          const before = document.body.querySelectorAll('iframe, .trends-widget, .widget-container').length;
+          const before = document.body.querySelectorAll('iframe').length;
           trends.embed.renderExploreWidget(
             'TIMESERIES',
             { comparisonItem:[{ keyword, geo:TRENDS_GEO, time:TRENDS_TIME }], category:0, property:'' },
             { exploreQuery: `q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath:'https://trends.google.com:443/trends/embed/' }
           );
-          // Move the newly-added iframe into our container once it appears
           const observer=new MutationObserver(()=>{
             const iframes=[...document.querySelectorAll('iframe')];
             if (iframes.length>before){
               const iframe=iframes[iframes.length-1];
-              container.appendChild(iframe);
-              observer.disconnect();
+              container.appendChild(iframe); observer.disconnect();
             }
           });
           observer.observe(document.body,{childList:true,subtree:true});
           return;
         }
-        // As a last resort, build a direct iframe (works for simple TIMESERIES embeds)
         const src = `https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
         const iframe=document.createElement('iframe');
         iframe.src=src; iframe.width='100%'; iframe.height='100%'; iframe.frameBorder='0';
         container.appendChild(iframe);
       }catch(e){
-        const err=document.createElement('div');
-        err.style.color='#f99';
-        err.textContent='Trends embed error: '+e.message;
-        container.appendChild(err);
+        const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends embed error: '+e.message; container.appendChild(err);
+      }
+    }
+
+    /* =============================
+       DATA FETCHERS (Breakout Radar)
+       ============================= */
+    async function yahooChart(symbol, range='1y', interval='1d'){
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}&includePrePost=false&events=div%7Csplit`;
+      const r = await fetch(url); if(!r.ok) throw new Error('chart fetch failed');
+      return r.json();
+    }
+    async function yahooQuote(symbol){
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`;
+      const r = await fetch(url); if(!r.ok) throw new Error('quote fetch failed');
+      return r.json();
+    }
+    async function yahooEarnings(symbol){
+      try{
+        const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=calendarEvents`;
+        const r = await fetch(url); if(!r.ok) throw new Error('earnings fetch failed');
+        return r.json();
+      }catch(e){ return null; }
+    }
+
+    function pctFmt(x){ return (x*100).toFixed(1)+'%'; }
+    function signIcon(ok){ return ok ? '✅' : '—'; }
+
+    async function populateRadar(rowIdx, symbol){
+      try{
+        const [chart, quote, benchChart] = await Promise.all([
+          yahooChart(symbol, '1y', '1d'),
+          yahooQuote(symbol),
+          yahooChart(BENCHMARK, '6mo', '1d')
+        ]);
+        const c = chart.chart.result[0];
+        const closes = c.indicators.quote[0].close.filter(v=>v!=null);
+        const volumes = c.indicators.quote[0].volume.filter(v=>v!=null);
+        const price = closes[closes.length-1];
+
+        // Volume vs 20d avg
+        const recentVol = volumes[volumes.length-1];
+        const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0)/Math.min(AVG_VOL_WINDOW, volumes.length);
+        const volVs = recentVol/avgVol;
+        document.getElementById(`vavg-${rowIdx}`).textContent = volVs.toFixed(2)+'x';
+        document.getElementById(`vavg-s-${rowIdx}`).textContent = signIcon(volVs>=THRESHOLDS.volVsAvg);
+
+        // RS vs benchmark over RS_LOOKBACK
+        const bc = benchChart.chart.result[0].indicators.quote[0].close.filter(v=>v!=null);
+        const p0 = closes[closes.length-1-RS_LOOKBACK];
+        const b0 = bc[bc.length-1-RS_LOOKBACK];
+        const rs = (price/p0) / (bc[bc.length-1]/b0) - 1; // relative outperformance
+        document.getElementById(`rs-${rowIdx}`).textContent = pctFmt(rs);
+        document.getElementById(`rs-s-${rowIdx}`).textContent = signIcon(rs>=THRESHOLDS.rsOutperformance);
+
+        // Price vs 30d high
+        const windowCloses = closes.slice(-HIGH_LOOKBACK);
+        const high = Math.max(...windowCloses);
+        const nearHigh = price/high - 1; // negative number if below high
+        document.getElementById(`phigh-${rowIdx}`).textContent = pctFmt(nearHigh);
+        document.getElementById(`phigh-s-${rowIdx}`).textContent = signIcon(nearHigh>=THRESHOLDS.nearHighPct);
+
+        // MAs
+        const ma = (arr, n) => arr.slice(-n).reduce((a,b)=>a+b,0)/Math.min(n, arr.length);
+        const ma50 = ma(closes, MA50_WINDOW);
+        const ma200 = ma(closes, MA200_WINDOW);
+        const above50 = price>ma50; const above200 = price>ma200;
+        document.getElementById(`ma-${rowIdx}`).textContent = `${above50? 'Above' : 'Below'} 50d / ${above200? 'Above':'Below'} 200d`;
+        document.getElementById(`ma-s-${rowIdx}`).textContent = signIcon(above50 && above200);
+
+        // Earnings date (best-effort)
+        try{
+          const e = await yahooEarnings(symbol);
+          const ev = e?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
+          if(ev){
+            const dt = new Date(ev*1000);
+            document.getElementById(`earn-${rowIdx}`).textContent = dt.toISOString().slice(0,10);
+          }
+        }catch(_){/* ignore */}
+      }catch(err){
+        const cells = ['vavg','vavg-s','rs','rs-s','phigh','phigh-s','ma','ma-s','earn'];
+        cells.forEach(id=>{ const el=document.getElementById(`${id}-${rowIdx}`); if(el) el.textContent = '—'; });
+        console.error('Radar error for', symbol, err);
       }
     }
 
@@ -121,15 +213,32 @@
       mid.appendChild(hM); mid.appendChild(cM);
 
       const right=document.createElement('div'); right.className='card';
-      const hR=document.createElement('h2'); hR.textContent='Future Data';
-      const box=document.createElement('div'); box.className='placeholder'; box.textContent='Reserved for fundamentals / notes / alerts';
-      right.appendChild(hR); right.appendChild(box);
+      const hR=document.createElement('h2'); hR.textContent='Breakout Radar';
+      const tbl=document.createElement('table');
+      tbl.style.width='100%'; tbl.style.borderCollapse='collapse'; tbl.style.fontSize='12px';
+      tbl.innerHTML = `
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 4px;border-bottom:1px solid var(--border);">Metric</th>
+            <th style="text-align:right;padding:6px 4px;border-bottom:1px solid var(--border);">Value</th>
+            <th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--border);">Signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:6px 4px;">Volume vs 20d Avg</td><td id="vavg-${idx}" style="text-align:right;padding:6px 4px;">—</td><td id="vavg-s-${idx}" style="text-align:center;">—</td></tr>
+          <tr><td style="padding:6px 4px;">RS vs ${BENCHMARK} (${RS_LOOKBACK}d)</td><td id="rs-${idx}" style="text-align:right;padding:6px 4px;">—</td><td id="rs-s-${idx}" style="text-align:center;">—</td></tr>
+          <tr><td style="padding:6px 4px;">Price vs 30d High</td><td id="phigh-${idx}" style="text-align:right;padding:6px 4px;">—</td><td id="phigh-s-${idx}" style="text-align:center;">—</td></tr>
+          <tr><td style="padding:6px 4px;">Above 50d / 200d MA</td><td id="ma-${idx}" style="text-align:right;padding:6px 4px;">—</td><td id="ma-s-${idx}" style="text-align:center;">—</td></tr>
+          <tr><td style="padding:6px 4px;">Next Earnings</td><td id="earn-${idx}" style="text-align:right;padding:6px 4px;">—</td><td style="text-align:center;">—</td></tr>
+        </tbody>`;
+      right.appendChild(hR); right.appendChild(tbl);
 
       grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
 
       // Render widgets
       renderTradingView(cL, item.symbol);
       renderTrends(cM, item.trendTerm);
+      populateRadar(idx, item.symbol);
     });
   </script>
 </body>
