@@ -5,36 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stocks + Google Trends Dashboard</title>
   <style>
-    :root {
-      --bg: #0b0f14;
-      --panel: #111826;
-      --border: #1c2633;
-      --text: #e6eef7;
-      --muted: #9fb3c8;
-    }
-    html, body { height: 100%; }
-    body {
-      margin: 0; background: var(--bg); color: var(--text);
-      font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    header { padding: 20px; border-bottom: 1px solid var(--border); }
-    h1 { margin: 0; font-size: 18px; }
-    .container {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr; /* Left = Stocks, Middle = Trends, Right = Future data */
-      gap: 16px; padding: 16px; align-items: start;
-    }
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
-    .card h2 { margin: 0 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: .2px; }
-    .chart { height: 400px; }
-    .trend { height: 360px; }
-    .placeholder { height: 120px; display: grid; place-items: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 12px; background: transparent; }
-
-    /* Responsive: stack to one column on small screens */
-    @media (max-width: 980px) {
-      .container { grid-template-columns: 1fr; }
-      .chart, .trend { height: 300px; }
-    }
+    :root { --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8; }
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    header{padding:20px;border-bottom:1px solid var(--border)}
+    h1{margin:0;font-size:18px}
+    .container{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:16px;align-items:start}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px}
+    .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.2px}
+    .chart{height:400px}
+    .trend{height:360px}
+    .placeholder{height:120px;display:grid;place-items:center;color:var(--muted);border:1px dashed var(--border);border-radius:12px;background:transparent}
+    @media (max-width:980px){.container{grid-template-columns:1fr}.chart,.trend{height:300px}}
   </style>
 </head>
 <body>
@@ -44,120 +26,110 @@
 
   <div id="grid" class="container"></div>
 
-  <!-- TradingView & Google Trends embed scripts -->
+  <!-- Load Google Trends embed loader BEFORE our script -->
   <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
   <script>
     /* =============================
        CONFIG — EDIT THIS ONLY
        ============================= */
     const WATCHLIST = [
-      // Each item becomes one ROW across the 3 columns
-      // symbol: full exchange:ticker for TradingView
-      // name: display name on cards
-      // trendTerm: Google Trends search term (Worldwide, last 3 months)
       { symbol: "NASDAQ:MVIS", name: "MicroVision (MVIS)", trendTerm: "MicroVision" },
       { symbol: "NASDAQ:QSI",  name: "Quantum-Si (QSI)",   trendTerm: "Quantum-Si" },
       { symbol: "NASDAQ:REKR", name: "Rekor Systems (REKR)", trendTerm: "Rekor Systems" }
-      // To add a stock: copy a line above and change symbol/name/trendTerm
     ];
-
-    // Trends settings — worldwide, last 3 months
-    const TRENDS_GEO = "";           // "" = worldwide
+    const TRENDS_GEO = "";            // "" = Worldwide
     const TRENDS_TIME = "today 3-m";  // last 3 months
 
     /* =============================
-       RENDERER — No need to edit
+       HELPERS
        ============================= */
     const grid = document.getElementById('grid');
 
-    // Helper: render a TradingView Symbol Overview widget into a container
-    function renderTradingView(container, symbol) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'tradingview-widget-container';
-      const widget = document.createElement('div');
-      widget.className = 'tradingview-widget-container__widget';
-      wrapper.appendChild(widget);
-
-      const script = document.createElement('script');
-      script.type = 'text/javascript';
-      script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
-      script.async = true;
-      script.innerHTML = JSON.stringify({
-        symbols: [[symbol + '|1D']],
-        chartOnly: false,
-        width: '100%',
-        height: '100%',
-        locale: 'en',
-        autosize: true,
-        dateRange: '12M',
-        showVolume: true,
-        showMA: true,
-        hideDateRanges: false,
-        lineWidth: 2
+    function renderTradingView(container, symbol){
+      const wrap=document.createElement('div');
+      wrap.className='tradingview-widget-container';
+      const widget=document.createElement('div');
+      widget.className='tradingview-widget-container__widget';
+      wrap.appendChild(widget);
+      const s=document.createElement('script');
+      s.type='text/javascript';
+      s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
+      s.async=true;
+      s.innerHTML=JSON.stringify({
+        symbols:[[symbol+"|1D"]],chartOnly:false,width:"100%",height:"100%",locale:"en",autosize:true,dateRange:"12M",showVolume:true,showMA:true
       });
-
-      wrapper.appendChild(script);
-      container.appendChild(wrapper);
+      wrap.appendChild(s);
+      container.appendChild(wrap);
     }
 
-    // Helper: render a Google Trends time series into a container
-    function renderTrends(container, keyword) {
-      // Use Google Trends official embed loader
-      // IMPORTANT: target a specific container using renderExploreWidgetTo
-      trends.embed.renderExploreWidgetTo(
-        container,
-        'TIMESERIES',
-        { comparisonItem: [{ keyword, geo: TRENDS_GEO, time: TRENDS_TIME }], category: 0, property: '' },
-        { exploreQuery: `q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath: 'https://trends.google.com:443/trends/embed/' }
-      );
-    }], category: 0, property: '' },
-        { exploreQuery: `q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath: 'https://trends.google.com:443/trends/embed/' },
-        container
-      );
+    function renderTrends(container, keyword){
+      try{
+        if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
+          trends.embed.renderExploreWidgetTo(
+            container,
+            'TIMESERIES',
+            { comparisonItem:[{ keyword, geo:TRENDS_GEO, time:TRENDS_TIME }], category:0, property:'' },
+            { exploreQuery: `q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath:'https://trends.google.com:443/trends/embed/' }
+          );
+          return;
+        }
+        if (window.trends && trends.embed && typeof trends.embed.renderExploreWidget==='function'){
+          // Fallback: render to body, then move the last inserted widget into our container
+          const before = document.body.querySelectorAll('iframe, .trends-widget, .widget-container').length;
+          trends.embed.renderExploreWidget(
+            'TIMESERIES',
+            { comparisonItem:[{ keyword, geo:TRENDS_GEO, time:TRENDS_TIME }], category:0, property:'' },
+            { exploreQuery: `q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath:'https://trends.google.com:443/trends/embed/' }
+          );
+          // Move the newly-added iframe into our container once it appears
+          const observer=new MutationObserver(()=>{
+            const iframes=[...document.querySelectorAll('iframe')];
+            if (iframes.length>before){
+              const iframe=iframes[iframes.length-1];
+              container.appendChild(iframe);
+              observer.disconnect();
+            }
+          });
+          observer.observe(document.body,{childList:true,subtree:true});
+          return;
+        }
+        // As a last resort, build a direct iframe (works for simple TIMESERIES embeds)
+        const src = `https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
+        const iframe=document.createElement('iframe');
+        iframe.src=src; iframe.width='100%'; iframe.height='100%'; iframe.frameBorder='0';
+        container.appendChild(iframe);
+      }catch(e){
+        const err=document.createElement('div');
+        err.style.color='#f99';
+        err.textContent='Trends embed error: '+e.message;
+        container.appendChild(err);
+      }
     }
 
-    // Build rows: [Left stock] [Middle trends] [Right future]
-    WATCHLIST.forEach((item, idx) => {
-      // LEFT: Stock card
-      const left = document.createElement('div');
-      left.className = 'card';
-      const hLeft = document.createElement('h2');
-      hLeft.textContent = `${item.name} — Price & Chart`;
-      const cLeft = document.createElement('div');
-      cLeft.className = 'chart';
-      left.appendChild(hLeft);
-      left.appendChild(cLeft);
+    /* =============================
+       BUILD GRID ROWS
+       ============================= */
+    WATCHLIST.forEach((item, idx)=>{
+      const left=document.createElement('div'); left.className='card';
+      const hL=document.createElement('h2'); hL.textContent=`${item.name} — Price & Chart`;
+      const cL=document.createElement('div'); cL.className='chart';
+      left.appendChild(hL); left.appendChild(cL);
 
-      // MIDDLE: Trends card
-      const mid = document.createElement('div');
-      mid.className = 'card';
-      const hMid = document.createElement('h2');
-      hMid.textContent = `Google Trends — “${item.trendTerm}” (3 months, Worldwide)`;
-      const cMid = document.createElement('div');
-      cMid.className = 'trend';
-      cMid.id = `trend-${idx}`; // unique per row
-      mid.appendChild(hMid);
-      mid.appendChild(cMid);
+      const mid=document.createElement('div'); mid.className='card';
+      const hM=document.createElement('h2'); hM.textContent=`Google Trends — “${item.trendTerm}” (3 months, Worldwide)`;
+      const cM=document.createElement('div'); cM.className='trend'; cM.id=`trend-${idx}`;
+      mid.appendChild(hM); mid.appendChild(cM);
 
-      // RIGHT: Placeholder for future data
-      const right = document.createElement('div');
-      right.className = 'card';
-      const hRight = document.createElement('h2');
-      hRight.textContent = 'Future Data';
-      const box = document.createElement('div');
-      box.className = 'placeholder';
-      box.textContent = 'Reserved for fundamentals / notes / alerts';
-      right.appendChild(hRight);
-      right.appendChild(box);
+      const right=document.createElement('div'); right.className='card';
+      const hR=document.createElement('h2'); hR.textContent='Future Data';
+      const box=document.createElement('div'); box.className='placeholder'; box.textContent='Reserved for fundamentals / notes / alerts';
+      right.appendChild(hR); right.appendChild(box);
 
-      // Append in column order: left, middle, right
-      grid.appendChild(left);
-      grid.appendChild(mid);
-      grid.appendChild(right);
+      grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
 
-      // Render widgets after DOM nodes exist
-      renderTradingView(cLeft, item.symbol);
-      renderTrends(cMid, item.trendTerm);
+      // Render widgets
+      renderTradingView(cL, item.symbol);
+      renderTrends(cM, item.trendTerm);
     });
   </script>
 </body>
