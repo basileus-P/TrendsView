@@ -69,26 +69,41 @@
       nearHighPct: -0.05,     // within 5% of 30d high
       rsOutperformance: 0.02  // RS >= +2% vs benchmark
     };
-// Always return RAW body (JSON or CSV) with permissive CORS
-async function getRaw(url){
-  const prox = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-  const r = await fetch(prox);
-  if (!r.ok) throw new Error('proxy fetch failed');
-  return r.text();
+// ---- Resilient CORS fetch helpers ----
+
+// Try a list of permissive CORS read proxies until one works
+async function getRaw(url) {
+  const candidates = [
+    // isomorphic-git proxy (very reliable)
+    'https://cors.isomorphic-git.org/' + url,
+    // corsproxy.io
+    'https://corsproxy.io/?' + encodeURIComponent(url),
+    // allorigins (some regions block it; keep as #3)
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+  ];
+
+  // add cache-buster to reduce stale caching on proxies
+  const addBuster = u => u + (u.includes('?') ? '&' : '?') + 'noCache=' + Date.now();
+
+  let lastErr;
+  for (const prox of candidates) {
+    try {
+      const r = await fetch(addBuster(prox));
+      if (!r.ok) throw new Error('proxy status ' + r.status);
+      return await r.text();
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('all proxies failed');
 }
 
 // Safe JSON fetch via proxy (handles wrong content-types)
-async function getJSON(url){
+async function getJSON(url) {
   const txt = await getRaw(url);
   try { return JSON.parse(txt); }
-  catch (e) { throw new Error('bad JSON: ' + txt.slice(0,60)); }
+  catch (e) { throw new Error('bad JSON: ' + txt.slice(0, 80)); }
 }
-
-// Convert "EXCHANGE:TICKER" -> "TICKER" for Yahoo endpoints
-function yTicker(sym){
-  return String(sym || '').split(':').pop().trim().toUpperCase();
-}
-
 
 // Convert "EXCHANGE:TICKER" -> "TICKER" for Yahoo endpoints
 function yTicker(sym){
@@ -101,12 +116,11 @@ async function yahooChart(ticker, range='1y', interval='1d'){
   return getJSON(url);
 }
 
+// Yahoo Finance (proxied) — earnings date (best-effort)
 async function yahooEarnings(ticker){
   const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
   return getJSON(url);
 }
-
-
     
     /* =============================
        STORAGE
@@ -337,6 +351,7 @@ function viaProxy(url){
   </script>
 </body>
 </html>
+
 
 
 
