@@ -67,7 +67,10 @@
       nearHighPct: -0.05,
       rsOutperformance: 0.02
     };
-
+// Convert "EXCHANGE:TICKER" -> "TICKER" for Yahoo endpoints
+function yTicker(sym){
+  return String(sym || '').split(':').pop().trim();
+}
     function getWatchlist(){
       try{
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -135,56 +138,64 @@
     function pctFmt(x){ return (x*100).toFixed(1)+'%'; }
     function signIcon(ok){ return ok ? '✅' : '—'; }
 
-    async function populateRadar(rowIdx, symbol){
-      try{
-        const [chart, benchChart] = await Promise.all([
-          yahooChart(symbol, '1y', '1d'),
-          yahooChart(BENCHMARK, '6mo', '1d')
-        ]);
-        const c = chart.chart.result[0];
-        const closes = c.indicators.quote[0].close.filter(v=>v!=null);
-        const volumes = c.indicators.quote[0].volume.filter(v=>v!=null);
-        const price = closes[closes.length-1];
+  async function populateRadar(rowIdx, symbol){
+  const yt = yTicker(symbol); // <-- plain ticker for Yahoo ("MVIS", "QSI", "REKR", etc.)
+  try{
+    const [chart, benchChart] = await Promise.all([
+      yahooChart(yt, '1y', '1d'),
+      yahooChart(BENCHMARK, '6mo', '1d')
+    ]);
 
-        const recentVol = volumes[volumes.length-1];
-        const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0)/Math.min(AVG_VOL_WINDOW, volumes.length);
-        const volVs = recentVol/avgVol;
-        document.getElementById(`vavg-${rowIdx}`).textContent = volVs.toFixed(2)+'x';
-        document.getElementById(`vavg-s-${rowIdx}`).textContent = signIcon(volVs>=THRESHOLDS.volVsAvg);
+    const c = chart.chart?.result?.[0];
+    const q = c?.indicators?.quote?.[0];
+    const closes = (q?.close || []).filter(v => v != null);
+    const volumes = (q?.volume || []).filter(v => v != null);
+    if (closes.length === 0 || volumes.length === 0) throw new Error('No price/volume data');
 
-        const bc = benchChart.chart.result[0].indicators.quote[0].close.filter(v=>v!=null);
-        const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
-        const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
-        const rs = (price/p0) / (bc[bc.length-1]/b0) - 1;
-        document.getElementById(`rs-${rowIdx}`).textContent = pctFmt(rs);
-        document.getElementById(`rs-s-${rowIdx}`).textContent = signIcon(rs>=THRESHOLDS.rsOutperformance);
+    const price = closes[closes.length-1];
 
-        const windowCloses = closes.slice(-HIGH_LOOKBACK);
-        const high = Math.max(...windowCloses);
-        const nearHigh = price/high - 1;
-        document.getElementById(`phigh-${rowIdx}`).textContent = pctFmt(nearHigh);
-        document.getElementById(`phigh-s-${rowIdx}`).textContent = signIcon(nearHigh>=THRESHOLDS.nearHighPct);
+    // Volume vs 20d avg
+    const recentVol = volumes[volumes.length-1];
+    const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0)/Math.min(AVG_VOL_WINDOW, volumes.length);
+    const volVs = recentVol/avgVol;
+    document.getElementById(`vavg-${rowIdx}`).textContent = volVs.toFixed(2)+'x';
+    document.getElementById(`vavg-s-${rowIdx}`).textContent = volVs>=THRESHOLDS.volVsAvg ? '✅' : '—';
 
-        const ma = (arr, n) => arr.slice(-n).reduce((a,b)=>a+b,0)/Math.min(n, arr.length);
-        const ma50 = ma(closes, MA50_WINDOW);
-        const ma200 = ma(closes, MA200_WINDOW);
-        const above50 = price>ma50; const above200 = price>ma200;
-        document.getElementById(`ma-${rowIdx}`).textContent = `${above50? 'Above' : 'Below'} 50d / ${above200? 'Above':'Below'} 200d`;
-        document.getElementById(`ma-s-${rowIdx}`).textContent = signIcon(above50 && above200);
+    // RS vs QQQ
+    const bc = benchChart.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null) || [];
+    const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
+    const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
+    const rs = (price/p0) / (bc[bc.length-1]/b0) - 1;
+    document.getElementById(`rs-${rowIdx}`).textContent = (rs*100).toFixed(1)+'%';
+    document.getElementById(`rs-s-${rowIdx}`).textContent = rs>=THRESHOLDS.rsOutperformance ? '✅' : '—';
 
-        const e = await yahooEarnings(symbol);
-        const ev = e?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
-        if(ev){
-          const dt = new Date(ev*1000);
-          document.getElementById(`earn-${rowIdx}`).textContent = dt.toISOString().slice(0,10);
-        }
-      }catch(err){
-        const cells = ['vavg','vavg-s','rs','rs-s','phigh','phigh-s','ma','ma-s','earn'];
-        cells.forEach(id=>{ const el=document.getElementById(`${id}-${rowIdx}`); if(el) el.textContent = '—'; });
-        console.error('Radar error for', symbol, err);
-      }
-    }
+    // Price vs 30d high
+    const windowCloses = closes.slice(-HIGH_LOOKBACK);
+    const high = Math.max(...windowCloses);
+    const nearHigh = price/high - 1;
+    document.getElementById(`phigh-${rowIdx}`).textContent = (nearHigh*100).toFixed(1)+'%';
+    document.getElementById(`phigh-s-${rowIdx}`).textContent = nearHigh>=THRESHOLDS.nearHighPct ? '✅' : '—';
 
+    // MAs
+    const ma = (arr, n) => arr.slice(-n).reduce((a,b)=>a+b,0)/Math.min(n, arr.length);
+    const ma50 = ma(closes, MA50_WINDOW);
+    const ma200 = ma(closes, MA200_WINDOW);
+    const above50 = price>ma50; const above200 = price>ma200;
+    document.getElementById(`ma-${rowIdx}`).textContent = `${above50? 'Above' : 'Below'} 50d / ${above200? 'Above':'Below'} 200d`;
+    document.getElementById(`ma-s-${rowIdx}`).textContent = (above50 && above200) ? '✅' : '—';
+
+    // Next earnings
+    try{
+      const e = await yahooEarnings(yt);
+      const ev = e?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
+      if(ev){ document.getElementById(`earn-${rowIdx}`).textContent = new Date(ev*1000).toISOString().slice(0,10); }
+    }catch(_){}
+  }catch(err){
+    ['vavg','vavg-s','rs','rs-s','phigh','phigh-s','ma','ma-s','earn']
+      .forEach(id => { const el=document.getElementById(`${id}-${rowIdx}`); if(el) el.textContent='—'; });
+    console.error('Radar error for', yt, err);
+  }
+}
     function buildRow(item, idx){
       const left=document.createElement('div'); left.className='card';
       const hL=document.createElement('h2'); hL.textContent=`${item.name} — Price & Chart`;
@@ -257,3 +268,4 @@
   </script>
 </body>
 </html>
+
