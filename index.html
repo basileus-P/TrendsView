@@ -67,6 +67,36 @@
       nearHighPct: -0.05,
       rsOutperformance: 0.02
     };
+// Turn "EXCHANGE:TICKER" -> stooq symbol (US: ticker.us)
+function stooqSymbol(sym){
+  const t = String(sym || '').split(':').pop().trim().toLowerCase();
+  // crude mapping: assume US stocks; adjust if you later add other markets
+  return `${t}.us`;
+}
+
+async function fetchStooqDailyCSV(sym){ // returns array of {date, open, high, low, close, volume}
+  const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error('stooq fetch failed');
+  const text = await r.text();
+  // Parse CSV
+  const lines = text.trim().split('\n');
+  const hdr = lines.shift().split(',');
+  const idx = Object.fromEntries(hdr.map((h,i)=>[h,i]));
+  return lines.map(line=>{
+    const c = line.split(',');
+    return {
+      date: c[idx['Date']],
+      open: +c[idx['Open']],
+      high: +c[idx['High']],
+      low: +c[idx['Low']],
+      close: +c[idx['Close']],
+      volume: +c[idx['Volume']]
+    };
+  }).filter(r => Number.isFinite(r.close) && Number.isFinite(r.volume));
+}
+
+    
 // Convert "EXCHANGE:TICKER" -> "TICKER" for Yahoo endpoints
 function yTicker(sym){
   return String(sym || '').split(':').pop().trim();
@@ -139,63 +169,65 @@ function yTicker(sym){
     function signIcon(ok){ return ok ? '✅' : '—'; }
 
   async function populateRadar(rowIdx, symbol){
-  const yt = yTicker(symbol); // <-- plain ticker for Yahoo ("MVIS", "QSI", "REKR", etc.)
   try{
-    const [chart, benchChart] = await Promise.all([
-      yahooChart(yt, '1y', '1d'),
-      yahooChart(BENCHMARK, '6mo', '1d')
+    const sym = stooqSymbol(symbol);      // e.g., "mvis.us"
+    const bench = stooqSymbol(BENCHMARK); // "qqq.us"
+
+    const [rows, brow] = await Promise.all([
+      fetchStooqDailyCSV(sym),
+      fetchStooqDailyCSV(bench)
     ]);
+    if(!rows.length || !brow.length) throw new Error('No stooq data');
 
-    const c = chart.chart?.result?.[0];
-    const q = c?.indicators?.quote?.[0];
-    const closes = (q?.close || []).filter(v => v != null);
-    const volumes = (q?.volume || []).filter(v => v != null);
-    if (closes.length === 0 || volumes.length === 0) throw new Error('No price/volume data');
-
+    // Use last ~200 rows (enough for MA200 if available)
+    const closes = rows.map(r=>r.close);
+    const volumes = rows.map(r=>r.volume);
     const price = closes[closes.length-1];
 
     // Volume vs 20d avg
     const recentVol = volumes[volumes.length-1];
-    const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0)/Math.min(AVG_VOL_WINDOW, volumes.length);
-    const volVs = recentVol/avgVol;
+    const lastN = volumes.slice(-AVG_VOL_WINDOW);
+    const avgVol = lastN.reduce((a,b)=>a+b,0) / Math.max(1, lastN.length);
+    const volVs = recentVol / (avgVol || 1);
     document.getElementById(`vavg-${rowIdx}`).textContent = volVs.toFixed(2)+'x';
-    document.getElementById(`vavg-s-${rowIdx}`).textContent = volVs>=THRESHOLDS.volVsAvg ? '✅' : '—';
+    document.getElementById(`vavg-s-${rowIdx}`).textContent = volVs>=THRESHOLDS.volVsAvg ? '✅':'—';
 
-    // RS vs QQQ
-    const bc = benchChart.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null) || [];
+    // RS vs benchmark over RS_LOOKBACK
+    const bc = brow.map(r=>r.close);
     const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
     const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
     const rs = (price/p0) / (bc[bc.length-1]/b0) - 1;
     document.getElementById(`rs-${rowIdx}`).textContent = (rs*100).toFixed(1)+'%';
-    document.getElementById(`rs-s-${rowIdx}`).textContent = rs>=THRESHOLDS.rsOutperformance ? '✅' : '—';
+    document.getElementById(`rs-s-${rowIdx}`).textContent = rs>=THRESHOLDS.rsOutperformance ? '✅':'—';
 
     // Price vs 30d high
     const windowCloses = closes.slice(-HIGH_LOOKBACK);
     const high = Math.max(...windowCloses);
     const nearHigh = price/high - 1;
     document.getElementById(`phigh-${rowIdx}`).textContent = (nearHigh*100).toFixed(1)+'%';
-    document.getElementById(`phigh-s-${rowIdx}`).textContent = nearHigh>=THRESHOLDS.nearHighPct ? '✅' : '—';
+    document.getElementById(`phigh-s-${rowIdx}`).textContent = nearHigh>=THRESHOLDS.nearHighPct ? '✅':'—';
 
     // MAs
-    const ma = (arr, n) => arr.slice(-n).reduce((a,b)=>a+b,0)/Math.min(n, arr.length);
+    const ma = (arr, n) => {
+      const seg = arr.slice(-n);
+      return seg.reduce((a,b)=>a+b,0) / Math.max(1, seg.length);
+    };
     const ma50 = ma(closes, MA50_WINDOW);
     const ma200 = ma(closes, MA200_WINDOW);
-    const above50 = price>ma50; const above200 = price>ma200;
-    document.getElementById(`ma-${rowIdx}`).textContent = `${above50? 'Above' : 'Below'} 50d / ${above200? 'Above':'Below'} 200d`;
+    const above50 = price > ma50;
+    const above200 = price > ma200;
+    document.getElementById(`ma-${rowIdx}`).textContent = `${above50? 'Above':'Below'} 50d / ${above200? 'Above':'Below'} 200d`;
     document.getElementById(`ma-s-${rowIdx}`).textContent = (above50 && above200) ? '✅' : '—';
 
-    // Next earnings
-    try{
-      const e = await yahooEarnings(yt);
-      const ev = e?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
-      if(ev){ document.getElementById(`earn-${rowIdx}`).textContent = new Date(ev*1000).toISOString().slice(0,10); }
-    }catch(_){}
+    // Earnings (not available via Stooq)
+    document.getElementById(`earn-${rowIdx}`).textContent = '—';
   }catch(err){
     ['vavg','vavg-s','rs','rs-s','phigh','phigh-s','ma','ma-s','earn']
       .forEach(id => { const el=document.getElementById(`${id}-${rowIdx}`); if(el) el.textContent='—'; });
-    console.error('Radar error for', yt, err);
+    console.error('Radar error', symbol, err);
   }
 }
+
     function buildRow(item, idx){
       const left=document.createElement('div'); left.className='card';
       const hL=document.createElement('h2'); hL.textContent=`${item.name} — Price & Chart`;
@@ -268,4 +300,5 @@ function yTicker(sym){
   </script>
 </body>
 </html>
+
 
