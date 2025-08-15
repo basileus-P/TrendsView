@@ -69,10 +69,26 @@
       nearHighPct: -0.05,     // within 5% of 30d high
       rsOutperformance: 0.02  // RS >= +2% vs benchmark
     };
-// CORS-safe proxy: fetch any URL via r.jina.ai (read-only cache with permissive CORS)
-function viaProxy(url){
-  return 'https://r.jina.ai/http://' + url.replace(/^https?:\/\//,'');
+// Always return RAW body (JSON or CSV) with permissive CORS
+async function getRaw(url){
+  const prox = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+  const r = await fetch(prox);
+  if (!r.ok) throw new Error('proxy fetch failed');
+  return r.text();
 }
+
+// Safe JSON fetch via proxy (handles wrong content-types)
+async function getJSON(url){
+  const txt = await getRaw(url);
+  try { return JSON.parse(txt); }
+  catch (e) { throw new Error('bad JSON: ' + txt.slice(0,60)); }
+}
+
+// Convert "EXCHANGE:TICKER" -> "TICKER" for Yahoo endpoints
+function yTicker(sym){
+  return String(sym || '').split(':').pop().trim().toUpperCase();
+}
+
 
 // Convert "EXCHANGE:TICKER" -> "TICKER" for Yahoo endpoints
 function yTicker(sym){
@@ -82,18 +98,14 @@ function yTicker(sym){
 // Yahoo Finance (proxied) — chart candles
 async function yahooChart(ticker, range='1y', interval='1d'){
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=${interval}&includePrePost=false&events=div%7Csplit`;
-  const r = await fetch(viaProxy(url));
-  if(!r.ok) throw new Error('yahoo chart fetch failed');
-  return r.json();
+  return getJSON(url);
 }
 
-// Yahoo Finance (proxied) — earnings date (best-effort)
 async function yahooEarnings(ticker){
   const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
-  const r = await fetch(viaProxy(url));
-  if(!r.ok) throw new Error('yahoo earnings fetch failed');
-  return r.json();
+  return getJSON(url);
 }
+
 
     
     /* =============================
@@ -200,8 +212,8 @@ function viaProxy(url){
       return seg.reduce((a,b)=>a+b,0) / Math.max(1, seg.length);
     }
 
-   async function populateRadar(rowIdx, symbol){
-  const t = yTicker(symbol);  // e.g., "MVIS"
+  async function populateRadar(rowIdx, symbol){
+  const t = yTicker(symbol);
   try{
     const [ch, bench] = await Promise.all([
       yahooChart(t, '1y', '1d'),
@@ -235,7 +247,7 @@ function viaProxy(url){
     // Price vs 30d high
     const windowCloses = closes.slice(-HIGH_LOOKBACK);
     const high = Math.max(...windowCloses);
-    const nearHigh = price/high - 1;  // negative if below high
+    const nearHigh = price/high - 1;
     document.getElementById(`phigh-${rowIdx}`).textContent = (nearHigh*100).toFixed(1)+'%';
     document.getElementById(`phigh-s-${rowIdx}`).textContent = nearHigh>=THRESHOLDS.nearHighPct ? '✅':'—';
 
@@ -247,16 +259,14 @@ function viaProxy(url){
     document.getElementById(`ma-${rowIdx}`).textContent = `${above50?'Above':'Below'} 50d / ${above200?'Above':'Below'} 200d`;
     document.getElementById(`ma-s-${rowIdx}`).textContent = (above50 && above200) ? '✅':'—';
 
-    // Earnings (best-effort; may be blank for microcaps)
+    // Earnings (best-effort)
     try{
       const ej = await yahooEarnings(t);
       const raw = ej?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
-      if(raw){ document.getElementById(`earn-${rowIdx}`).textContent = new Date(raw*1000).toISOString().slice(0,10); }
-      else    { document.getElementById(`earn-${rowIdx}`).textContent = '—'; }
+      document.getElementById(`earn-${rowIdx}`).textContent = raw ? new Date(raw*1000).toISOString().slice(0,10) : '—';
     }catch{ document.getElementById(`earn-${rowIdx}`).textContent = '—'; }
 
   }catch(err){
-    // keep UI stable on any error
     ['vavg','vavg-s','rs','rs-s','phigh','phigh-s','ma','ma-s','earn']
       .forEach(id => { const el=document.getElementById(`${id}-${rowIdx}`); if(el) el.textContent='—'; });
     console.error('Radar error', t, err);
@@ -327,5 +337,6 @@ function viaProxy(url){
   </script>
 </body>
 </html>
+
 
 
