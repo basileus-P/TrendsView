@@ -38,16 +38,18 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>Stocks (left) • Google Trends (middle) • Breakout Radar (right)</h1>
-    <div class="toolbar">
-      <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="28" />
-      <input id="in-name" placeholder="Display name" size="20" />
-      <input id="in-trend" placeholder="Google Trends term" size="20" />
-      <button id="btn-add">Add</button>
-      <button id="btn-reset">Reset defaults</button>
-    </div>
-  </header>
+<header>
+  <h1>Stocks (left) • Google Trends (middle) • Breakout Radar (right)</h1>
+  <div class="toolbar">
+    <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="28" />
+    <input id="in-name" placeholder="Display name" size="20" />
+    <input id="in-trend" placeholder="Google Trends term" size="20" />
+    <button id="btn-add">Add</button>
+    <button id="btn-reset">Reset defaults</button>
+    <button id="btn-refresh">Refresh Now</button>
+    <span id="last-updated" style="color:var(--muted);font-size:12px;"></span>
+  </div>
+</header>
 
   <div id="grid" class="container"></div>
 
@@ -326,33 +328,47 @@
     }
 
     function renderAll(){
-      grid.innerHTML='';
-      getWatchlist().forEach((it, i)=> buildRow(it, i));
-    }
-    function addStock(){
-      const s = document.getElementById('in-symbol').value.trim();
-      const n = document.getElementById('in-name').value.trim() || s;
-      const t = document.getElementById('in-trend').value.trim() || n;
-      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
-      const list = getWatchlist(); list.push({ symbol:s, name:n, trendTerm:t }); setWatchlist(list); renderAll();
-      document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
-    }
-    function removeStock(idx){
-      const list = getWatchlist(); list.splice(idx,1); setWatchlist(list); renderAll();
-    }
-    function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
+    grid.innerHTML='';
+    getWatchlist().forEach((it, i)=> buildRow(it, i));
+    updateTimestamp();
+  }
 
-    document.getElementById('btn-add').addEventListener('click', addStock);
-    document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+  function addStock(){
+    const s = document.getElementById('in-symbol').value.trim();
+    const n = document.getElementById('in-name').value.trim() || s;
+    const t = document.getElementById('in-trend').value.trim() || n;
+    if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
+    const list = getWatchlist(); list.push({ symbol:s, name:n, trendTerm:t }); setWatchlist(list); renderAll();
+    document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
+  }
 
-    // Initial render
-    renderAll();
+  function removeStock(idx){
+    const list = getWatchlist(); list.splice(idx,1); setWatchlist(list); renderAll();
+  }
 
-    // Auto-refresh the radar every 5 minutes (without re-embedding left/middle)
-    setInterval(() => {
-      const list = getWatchlist();
-      list.forEach((it, i)=> populateRadar(i, it.symbol));
-    }, REFRESH_MS);
-  </script>
+  function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
+
+  function updateTimestamp(){
+    const ts = new Date().toLocaleTimeString();
+    document.getElementById('last-updated').textContent = `Last updated: ${ts}`;
+  }
+
+  function refreshRadarNow(){
+    const list = getWatchlist();
+    list.forEach((it, i)=> populateRadar(i, it.symbol));
+    updateTimestamp();
+  }
+
+  document.getElementById('btn-add').addEventListener('click', addStock);
+  document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+  document.getElementById('btn-refresh').addEventListener('click', refreshRadarNow);
+
+  // Initial render
+  renderAll();
+
+  // Auto-refresh the radar every 5 minutes
+  setInterval(refreshRadarNow, REFRESH_MS);
+</script>
 </body>
 </html>
+
