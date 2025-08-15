@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stocks + Google Trends Dashboard</title>
   <style>
-    :root { --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8; }
+    :root { --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8; --good:#19c37d; --bad:#d66; --warn:#d6a019; }
     html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
     header{padding:16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
@@ -24,6 +24,16 @@
     .chart{height:400px}
     .trend{height:360px}
     table{color:var(--text)} th,td{border-color:var(--border)}
+    .val { text-align:right; }
+    .sig { text-align:center; width:60px; }
+    .ok { color: var(--good); font-weight:600; }
+    .ko { color: var(--muted); }
+    .warn { color: var(--warn); }
+    .spark { height:44px; }
+    .spark svg { width:100%; height:44px; display:block; }
+    .spark .line { fill:none; stroke:#8fb6ff; stroke-width:2; }
+    .spark .fill { fill:rgba(143,182,255,0.12); stroke:none; }
+    .spark .axis { stroke:#233046; stroke-width:1; }
     @media (max-width:980px){.container{grid-template-columns:1fr}.chart,.trend{height:300px}}
   </style>
 </head>
@@ -64,64 +74,16 @@
     const MA50_WINDOW = 50;
     const MA200_WINDOW = 200;
 
+    // thresholds (tune as you like)
     const THRESHOLDS = {
-      volVsAvg: 2.0,          // >= 2x avg volume
-      nearHighPct: -0.05,     // within 5% of 30d high
-      rsOutperformance: 0.02  // RS >= +2% vs benchmark
+      volVsAvg: 1.5,          // >= 1.5x avg volume
+      nearHighPct: -0.10,     // within 10% of 30d high
+      rsOutperformance: 0.01  // RS >= +1% vs benchmark
     };
-// ---- Resilient CORS fetch helpers ----
 
-// Try a list of permissive CORS read proxies until one works
-async function getRaw(url) {
-  const candidates = [
-    // isomorphic-git proxy (very reliable)
-    'https://cors.isomorphic-git.org/' + url,
-    // corsproxy.io
-    'https://corsproxy.io/?' + encodeURIComponent(url),
-    // allorigins (some regions block it; keep as #3)
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
-  ];
+    // auto-refresh (milliseconds)
+    const REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
-  // add cache-buster to reduce stale caching on proxies
-  const addBuster = u => u + (u.includes('?') ? '&' : '?') + 'noCache=' + Date.now();
-
-  let lastErr;
-  for (const prox of candidates) {
-    try {
-      const r = await fetch(addBuster(prox));
-      if (!r.ok) throw new Error('proxy status ' + r.status);
-      return await r.text();
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr || new Error('all proxies failed');
-}
-
-// Safe JSON fetch via proxy (handles wrong content-types)
-async function getJSON(url) {
-  const txt = await getRaw(url);
-  try { return JSON.parse(txt); }
-  catch (e) { throw new Error('bad JSON: ' + txt.slice(0, 80)); }
-}
-
-// Convert "EXCHANGE:TICKER" -> "TICKER" for Yahoo endpoints
-function yTicker(sym){
-  return String(sym || '').split(':').pop().trim().toUpperCase();
-}
-
-// Yahoo Finance (proxied) — chart candles
-async function yahooChart(ticker, range='1y', interval='1d'){
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=${interval}&includePrePost=false&events=div%7Csplit`;
-  return getJSON(url);
-}
-
-// Yahoo Finance (proxied) — earnings date (best-effort)
-async function yahooEarnings(ticker){
-  const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
-  return getJSON(url);
-}
-    
     /* =============================
        STORAGE
        ============================= */
@@ -180,113 +142,147 @@ async function yahooEarnings(ticker){
     }
 
     /* =============================
-       STOOQ (no-key, CORS-friendly)
+       CORS-RESILIENT YAHOO FETCHERS
        ============================= */
-    // Map "EXCHANGE:TICKER" -> stooq symbol; assume US equities => ticker.us
-    function stooqSymbol(sym){
-      const t = String(sym || '').split(':').pop().trim().toLowerCase();
-      return `${t}.us`;
+    async function getRaw(url) {
+      const candidates = [
+        'https://cors.isomorphic-git.org/' + url,
+        'https://corsproxy.io/?' + encodeURIComponent(url),
+        'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+      ];
+      const addBuster = u => u + (u.includes('?') ? '&' : '?') + 'noCache=' + Date.now();
+      let lastErr;
+      for (const prox of candidates) {
+        try {
+          const r = await fetch(addBuster(prox));
+          if (!r.ok) throw new Error('proxy status ' + r.status);
+          return await r.text();
+        } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error('all proxies failed');
     }
-// Simple CORS-safe fetch proxy for static sites (HTTPS → HTTPS)
-function viaProxy(url){
-  // r.jina.ai fetches the target and returns it with permissive CORS headers
-  return 'https://r.jina.ai/http://' + url.replace(/^https?:\/\//,'');
-}
-    
-    // Fetch daily CSV and parse → [{date, open, high, low, close, volume}, ...]
-    async function fetchStooqDailyCSV(sym){
-  const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
-  const r = await fetch(viaProxy(url));   // <— use proxy
-  if(!r.ok) throw new Error('stooq fetch failed');
-  const text = await r.text();
-  const lines = text.trim().split('\n');
-  if(lines.length < 2) throw new Error('stooq empty');
-  const hdr = lines.shift().split(',');
-  const idx = Object.fromEntries(hdr.map((h,i)=>[h,i]));
-  return lines.map(line=>{
-    const c = line.split(',');
-    return {
-      date: c[idx['Date']],
-      open: +c[idx['Open']],
-      high: +c[idx['High']],
-      low: +c[idx['Low']],
-      close: +c[idx['Close']],
-      volume: +c[idx['Volume']]
-    };
-  }).filter(r => Number.isFinite(r.close) && Number.isFinite(r.volume));
-}
+    async function getJSON(url) {
+      const txt = await getRaw(url);
+      try { return JSON.parse(txt); }
+      catch (e) { throw new Error('bad JSON: ' + txt.slice(0,80)); }
+    }
+    function yTicker(sym){ return String(sym || '').split(':').pop().trim().toUpperCase(); }
+    async function yahooChart(ticker, range='1y', interval='1d'){
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=${interval}&includePrePost=false&events=div%7Csplit`;
+      return getJSON(url);
+    }
+    async function yahooEarnings(ticker){
+      const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
+      return getJSON(url);
+    }
 
     /* =============================
-       BREAKOUT RADAR (uses Stooq)
+       MINI SPARKLINE
        ============================= */
-    function pctFmt(x){ return (x*100).toFixed(1)+'%'; }
-    function sign(ok){ return ok ? '✅' : '—'; }
-    function sma(arr, n){
-      const seg = arr.slice(-n);
-      return seg.reduce((a,b)=>a+b,0) / Math.max(1, seg.length);
+    function drawSparkline(el, series){
+      // series: numbers (last N closes)
+      const W = el.clientWidth || 240, H = 44, P = 2;
+      const n = series.length;
+      const min = Math.min(...series), max = Math.max(...series);
+      const x = i => P + (W-2*P) * (i/(n-1 || 1));
+      const y = v => {
+        if(max === min) return H/2;
+        return H - P - (H-2*P) * ((v - min) / (max - min));
+      };
+      let d = '';
+      series.forEach((v,i)=>{ d += (i? 'L':'M') + x(i) + ',' + y(v); });
+      const fill = `${d} L ${x(n-1)},${H-P} L ${x(0)},${H-P} Z`;
+
+      el.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <path class="fill" d="${fill}"></path>
+          <path class="line" d="${d}"></path>
+          <line class="axis" x1="0" y1="${H-P}" x2="${W}" y2="${H-P}"></line>
+        </svg>`;
     }
 
-  async function populateRadar(rowIdx, symbol){
-  const t = yTicker(symbol);
-  try{
-    const [ch, bench] = await Promise.all([
-      yahooChart(t, '1y', '1d'),
-      yahooChart('QQQ', '6mo', '1d')
-    ]);
+    /* =============================
+       BREAKOUT RADAR (Yahoo)
+       ============================= */
+    function pctFmt(x){ return (x*100).toFixed(1)+'%'; }
+    function setSig(elValue, elSig, passed){
+      elSig.textContent = passed ? '✅' : '—';
+      elSig.className = 'sig ' + (passed ? 'ok' : 'ko');
+      elValue.className = 'val ' + (passed ? 'ok' : 'ko');
+    }
+    function sma(arr,n){ const seg=arr.slice(-n); return seg.reduce((a,b)=>a+b,0)/Math.max(1,seg.length); }
 
-    const c = ch?.chart?.result?.[0];
-    const q = c?.indicators?.quote?.[0];
-    const closes  = (q?.close  || []).filter(v => v != null);
-    const volumes = (q?.volume || []).filter(v => v != null);
-    if (closes.length === 0 || volumes.length === 0) throw new Error('no price/volume');
+    async function populateRadar(rowIdx, symbol){
+      const t = yTicker(symbol);
+      try{
+        const [ch, bench] = await Promise.all([
+          yahooChart(t, '1y', '1d'),
+          yahooChart(BENCHMARK, '6mo', '1d')
+        ]);
 
-    const price = closes[closes.length-1];
+        const c = ch?.chart?.result?.[0];
+        const q = c?.indicators?.quote?.[0];
+        const closes  = (q?.close  || []).filter(v => v != null);
+        const volumes = (q?.volume || []).filter(v => v != null);
+        if (closes.length === 0 || volumes.length === 0) throw new Error('no price/volume');
 
-    // Volume vs 20d avg
-    const recentVol = volumes[volumes.length-1];
-    const lastN = volumes.slice(-AVG_VOL_WINDOW);
-    const avgVol = lastN.reduce((a,b)=>a+b,0) / Math.max(1,lastN.length);
-    const volVs = recentVol / (avgVol || 1);
-    document.getElementById(`vavg-${rowIdx}`).textContent = volVs.toFixed(2)+'x';
-    document.getElementById(`vavg-s-${rowIdx}`).textContent = volVs>=THRESHOLDS.volVsAvg ? '✅':'—';
+        // Sparkline (last 30 bars)
+        const spark = document.getElementById(`spark-${rowIdx}`);
+        if (spark) drawSparkline(spark, closes.slice(-30));
 
-    // RS vs QQQ (10d)
-    const bc = bench?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null) || [];
-    const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
-    const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
-    const rs = (price/p0) / ((bc[bc.length-1]||p0)/(b0||bc[0]||1)) - 1;
-    document.getElementById(`rs-${rowIdx}`).textContent = (rs*100).toFixed(1)+'%';
-    document.getElementById(`rs-s-${rowIdx}`).textContent = rs>=THRESHOLDS.rsOutperformance ? '✅':'—';
+        const price = closes[closes.length-1];
 
-    // Price vs 30d high
-    const windowCloses = closes.slice(-HIGH_LOOKBACK);
-    const high = Math.max(...windowCloses);
-    const nearHigh = price/high - 1;
-    document.getElementById(`phigh-${rowIdx}`).textContent = (nearHigh*100).toFixed(1)+'%';
-    document.getElementById(`phigh-s-${rowIdx}`).textContent = nearHigh>=THRESHOLDS.nearHighPct ? '✅':'—';
+        // Volume vs 20d avg
+        const vCell = document.getElementById(`vavg-${rowIdx}`);
+        const vSig  = document.getElementById(`vavg-s-${rowIdx}`);
+        const recentVol = volumes[volumes.length-1];
+        const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0) / Math.max(1, Math.min(AVG_VOL_WINDOW, volumes.length));
+        const volVs = recentVol / (avgVol || 1);
+        vCell.textContent = volVs.toFixed(2)+'x';
+        setSig(vCell, vSig, volVs >= THRESHOLDS.volVsAvg);
 
-    // MAs
-    const sma = (arr,n)=>{ const seg=arr.slice(-n); return seg.reduce((a,b)=>a+b,0)/Math.max(1,seg.length); };
-    const ma50  = sma(closes, MA50_WINDOW);
-    const ma200 = sma(closes, MA200_WINDOW);
-    const above50 = price>ma50, above200 = price>ma200;
-    document.getElementById(`ma-${rowIdx}`).textContent = `${above50?'Above':'Below'} 50d / ${above200?'Above':'Below'} 200d`;
-    document.getElementById(`ma-s-${rowIdx}`).textContent = (above50 && above200) ? '✅':'—';
+        // RS vs QQQ (10d)
+        const rCell = document.getElementById(`rs-${rowIdx}`);
+        const rSig  = document.getElementById(`rs-s-${rowIdx}`);
+        const bc = bench?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null) || [];
+        const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
+        const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
+        const rs = (price/p0) / ((bc[bc.length-1]||p0)/(b0||bc[0]||1)) - 1;
+        rCell.textContent = pctFmt(rs);
+        setSig(rCell, rSig, rs >= THRESHOLDS.rsOutperformance);
 
-    // Earnings (best-effort)
-    try{
-      const ej = await yahooEarnings(t);
-      const raw = ej?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
-      document.getElementById(`earn-${rowIdx}`).textContent = raw ? new Date(raw*1000).toISOString().slice(0,10) : '—';
-    }catch{ document.getElementById(`earn-${rowIdx}`).textContent = '—'; }
+        // Price vs 30d high
+        const hCell = document.getElementById(`phigh-${rowIdx}`);
+        const hSig  = document.getElementById(`phigh-s-${rowIdx}`);
+        const windowCloses = closes.slice(-HIGH_LOOKBACK);
+        const high = Math.max(...windowCloses);
+        const nearHigh = price/high - 1;  // negative if below high
+        hCell.textContent = pctFmt(nearHigh);
+        setSig(hCell, hSig, nearHigh >= THRESHOLDS.nearHighPct);
 
-  }catch(err){
-    ['vavg','vavg-s','rs','rs-s','phigh','phigh-s','ma','ma-s','earn']
-      .forEach(id => { const el=document.getElementById(`${id}-${rowIdx}`); if(el) el.textContent='—'; });
-    console.error('Radar error', t, err);
-  }
-}
+        // MAs
+        const mCell = document.getElementById(`ma-${rowIdx}`);
+        const mSig  = document.getElementById(`ma-s-${rowIdx}`);
+        const ma50  = sma(closes, MA50_WINDOW);
+        const ma200 = sma(closes, MA200_WINDOW);
+        const above50 = price>ma50, above200 = price>ma200;
+        mCell.textContent = `${above50?'Above':'Below'} 50d / ${above200?'Above':'Below'} 200d`;
+        setSig(mCell, mSig, above50 && above200);
 
+        // Earnings (best-effort)
+        const eCell = document.getElementById(`earn-${rowIdx}`);
+        try{
+          const ej = await yahooEarnings(t);
+          const raw = ej?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
+          eCell.textContent = raw ? new Date(raw*1000).toISOString().slice(0,10) : '—';
+        }catch{ eCell.textContent = '—'; }
+
+      }catch(err){
+        ['vavg','vavg-s','rs','rs-s','phigh','phigh-s','ma','ma-s','earn']
+          .forEach(id => { const el=document.getElementById(`${id}-${rowIdx}`); if(el) { el.textContent='—'; el.className = el.className?.replace(/\bok\b/g,'ko'); } });
+        console.error('Radar error', t, err);
+      }
+    }
 
     /* =============================
        BUILD GRID ROWS
@@ -310,14 +306,15 @@ function viaProxy(url){
       tbl.style.width='100%'; tbl.style.borderCollapse='collapse'; tbl.style.fontSize='12px';
       tbl.innerHTML = `
         <thead>
-          <tr><th>Metric</th><th style="text-align:right;">Value</th><th style="text-align:center;">Signal</th></tr>
+          <tr><th>Metric</th><th class="val">Value</th><th class="sig">Signal</th></tr>
         </thead>
         <tbody>
-          <tr><td>Volume vs 20d Avg</td><td id="vavg-${idx}" style="text-align:right;">—</td><td id="vavg-s-${idx}" style="text-align:center;">—</td></tr>
-          <tr><td>RS vs ${BENCHMARK} (${RS_LOOKBACK}d)</td><td id="rs-${idx}" style="text-align:right;">—</td><td id="rs-s-${idx}" style="text-align:center;">—</td></tr>
-          <tr><td>Price vs 30d High</td><td id="phigh-${idx}" style="text-align:right;">—</td><td id="phigh-s-${idx}" style="text-align:center;">—</td></tr>
-          <tr><td>Above 50d / 200d MA</td><td id="ma-${idx}" style="text-align:right;">—</td><td id="ma-s-${idx}" style="text-align:center;">—</td></tr>
-          <tr><td>Next Earnings</td><td id="earn-${idx}" style="text-align:right;">—</td><td style="text-align:center;">—</td></tr>
+          <tr><td>Volume vs 20d Avg</td><td id="vavg-${idx}" class="val">—</td><td id="vavg-s-${idx}" class="sig">—</td></tr>
+          <tr><td>RS vs ${BENCHMARK} (${RS_LOOKBACK}d)</td><td id="rs-${idx}" class="val">—</td><td id="rs-s-${idx}" class="sig">—</td></tr>
+          <tr><td>Price vs 30d High</td><td id="phigh-${idx}" class="val">—</td><td id="phigh-s-${idx}" class="sig">—</td></tr>
+          <tr><td>Above 50d / 200d MA</td><td id="ma-${idx}" class="val">—</td><td id="ma-s-${idx}" class="sig">—</td></tr>
+          <tr><td>Next Earnings</td><td id="earn-${idx}" class="val">—</td><td class="sig">—</td></tr>
+          <tr><td>Trend (30 bars)</td><td colspan="2"><div id="spark-${idx}" class="spark"></div></td></tr>
         </tbody>`;
       right.appendChild(hR); right.appendChild(remove); right.appendChild(tbl);
 
@@ -347,11 +344,15 @@ function viaProxy(url){
 
     document.getElementById('btn-add').addEventListener('click', addStock);
     document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+
+    // Initial render
     renderAll();
+
+    // Auto-refresh the radar every 5 minutes (without re-embedding left/middle)
+    setInterval(() => {
+      const list = getWatchlist();
+      list.forEach((it, i)=> populateRadar(i, it.symbol));
+    }, REFRESH_MS);
   </script>
 </body>
 </html>
-
-
-
-
