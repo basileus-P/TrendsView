@@ -135,28 +135,34 @@
       const t = String(sym || '').split(':').pop().trim().toLowerCase();
       return `${t}.us`;
     }
+// Simple CORS-safe fetch proxy for static sites (HTTPS → HTTPS)
+function viaProxy(url){
+  // r.jina.ai fetches the target and returns it with permissive CORS headers
+  return 'https://r.jina.ai/http://' + url.replace(/^https?:\/\//,'');
+}
+    
     // Fetch daily CSV and parse → [{date, open, high, low, close, volume}, ...]
     async function fetchStooqDailyCSV(sym){
-      const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
-      const r = await fetch(url, {mode:'cors'});
-      if(!r.ok) throw new Error('stooq fetch failed');
-      const text = await r.text();
-      const lines = text.trim().split('\n');
-      if(lines.length < 2) throw new Error('stooq empty');
-      const hdr = lines.shift().split(',');
-      const idx = Object.fromEntries(hdr.map((h,i)=>[h,i]));
-      return lines.map(line=>{
-        const c = line.split(',');
-        return {
-          date: c[idx['Date']],
-          open: +c[idx['Open']],
-          high: +c[idx['High']],
-          low: +c[idx['Low']],
-          close: +c[idx['Close']],
-          volume: +c[idx['Volume']]
-        };
-      }).filter(r => Number.isFinite(r.close) && Number.isFinite(r.volume));
-    }
+  const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
+  const r = await fetch(viaProxy(url));   // <— use proxy
+  if(!r.ok) throw new Error('stooq fetch failed');
+  const text = await r.text();
+  const lines = text.trim().split('\n');
+  if(lines.length < 2) throw new Error('stooq empty');
+  const hdr = lines.shift().split(',');
+  const idx = Object.fromEntries(hdr.map((h,i)=>[h,i]));
+  return lines.map(line=>{
+    const c = line.split(',');
+    return {
+      date: c[idx['Date']],
+      open: +c[idx['Open']],
+      high: +c[idx['High']],
+      low: +c[idx['Low']],
+      close: +c[idx['Close']],
+      volume: +c[idx['Volume']]
+    };
+  }).filter(r => Number.isFinite(r.close) && Number.isFinite(r.volume));
+}
 
     /* =============================
        BREAKOUT RADAR (uses Stooq)
@@ -285,3 +291,4 @@
   </script>
 </body>
 </html>
+
