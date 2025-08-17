@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stocks + Google Trends Dashboard</title>
   <style>
-    :root { --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8; --good:#19c37d; --bad:#d66; --warn:#d6a019; }
+    :root {
+      --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8;
+      --good:#19c37d; --bad:#d66; --warn:#d6a019; --accent:#8fb6ff;
+    }
     html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
     header{padding:16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
@@ -14,6 +17,7 @@
     .toolbar input{background:#0e1522;border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text)}
     .toolbar button{background:#152235;border:1px solid var(--border);color:#e6eef7;padding:8px 12px;border-radius:10px;cursor:pointer}
     .toolbar button:hover{filter:brightness(1.1)}
+    #last-updated{color:var(--muted);font-size:12px}
 
     .container{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:16px;align-items:start}
     .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative}
@@ -23,44 +27,48 @@
 
     .chart{height:400px}
     .trend{height:360px}
-    table{color:var(--text)} th,td{border-color:var(--border)}
-    .val { text-align:right; }
-    .sig { text-align:center; width:60px; }
-    .ok { color: var(--good); font-weight:600; }
-    .ko { color: var(--muted); }
-    .warn { color: var(--warn); }
-    .spark { height:44px; }
-    .spark svg { width:100%; height:44px; display:block; }
-    .spark .line { fill:none; stroke:#8fb6ff; stroke-width:2; }
-    .spark .fill { fill:rgba(143,182,255,0.12); stroke:none; }
-    .spark .axis { stroke:#233046; stroke-width:1; }
-    @media (max-width:980px){.container{grid-template-columns:1fr}.chart,.trend{height:300px}}
+    table{width:100%;border-collapse:collapse;color:var(--text)}
+    th,td{border-color:var(--border);padding:6px 4px}
+    th{border-bottom:1px solid var(--border);text-align:left}
+    td.val{text-align:right}
+    td.sig{text-align:center;width:60px}
+    .ok{color:var(--good);font-weight:600}
+    .ko{color:var(--muted)}
+    .warn{color:var(--warn)}
+    .spark{height:44px}
+    .spark svg{width:100%;height:44px;display:block}
+    .spark .line{fill:none;stroke:var(--accent);stroke-width:2}
+    .spark .fill{fill:rgba(143,182,255,0.12);stroke:none}
+    .spark .axis{stroke:#233046;stroke-width:1}
+
+    .news{margin-top:10px}
+    .news h3{margin:8px 0 4px;font-size:12px;color:var(--muted)}
+    .news ul{list-style:none;padding:0;margin:0}
+    .news li{margin:6px 0}
+    .news a{color:var(--accent);text-decoration:none}
+    .news a:hover{text-decoration:underline}
+    .news time{color:var(--muted);font-size:11px;margin-left:6px}
+
+    @media (max-width:980px){
+      .container{grid-template-columns:1fr}
+      .chart,.trend{height:300px}
+    }
   </style>
 </head>
 <body>
-<header>
-  <h1>Stocks (left) • Google Trends (middle) • Breakout Radar (right)</h1>
-  <div class="toolbar">
-    <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="28" />
-    <input id="in-name" placeholder="Display name" size="20" />
-    <input id="in-trend" placeholder="Google Trends term" size="20" />
-    <button id="btn-add">Add</button>
-    <button id="btn-reset">Reset defaults</button>
-    <button id="btn-refresh">Refresh Now</button>
-    <span id="last-updated" style="color:var(--muted);font-size:12px;"></span>
-  </div>
-</header>
+  <header>
+    <h1>Stocks (left) • Google Trends (middle) • Breakout Radar (right)</h1>
+    <div class="toolbar">
+      <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="28" />
+      <input id="in-name" placeholder="Display name" size="20" />
+      <input id="in-trend" placeholder="Google Trends term" size="20" />
+      <button id="btn-add">Add</button>
+      <button id="btn-reset">Reset defaults</button>
+      <button id="btn-refresh">Refresh Now</button>
+      <span id="last-updated"></span>
+    </div>
+  </header>
 
-  <style>
-  /* ...existing styles... */
-  .news { margin-top: 10px; }
-  .news h3 { margin: 8px 0 4px; font-size:12px; color:var(--muted); }
-  .news ul { list-style:none; padding:0; margin:0; }
-  .news li { margin:6px 0; }
-  .news a { color:#8fb6ff; text-decoration:none; }
-  .news a:hover { text-decoration:underline; }
-  .news time { color:var(--muted); font-size:11px; margin-left:6px; }
-</style>
   <div id="grid" class="container"></div>
 
   <!-- Google Trends embed loader -->
@@ -94,7 +102,8 @@
     };
 
     // auto-refresh (milliseconds)
-    const REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+    const REFRESH_MS = 5 * 60 * 1000;   // 5 minutes (radar)
+    const NEWS_REFRESH_MS = 15 * 60 * 1000; // 15 minutes (news)
 
     /* =============================
        STORAGE
@@ -154,7 +163,7 @@
     }
 
     /* =============================
-       CORS-RESILIENT YAHOO FETCHERS
+       RESILIENT CORS PROXIES (Yahoo + RSS)
        ============================= */
     async function getRaw(url) {
       const candidates = [
@@ -187,90 +196,19 @@
       const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
       return getJSON(url);
     }
-<script>
-  // ---- NEWS (Google News RSS via our proxy) ----
-  function cleanNameForQuery(name){
-    // strip "(TICKER)" etc. from display name
-    return String(name || '').replace(/\(.*?\)/g,'').trim();
-  }
 
-  async function fetchNewsItems(query){
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-    const xmlText = await getRaw(url); // uses the resilient proxy helper you already have
-    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
-    const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
-      const title = node.getElementsByTagName('title')[0]?.textContent || '';
-      const link = node.getElementsByTagName('link')[0]?.textContent || '#';
-      const pub  = node.getElementsByTagName('pubDate')[0]?.textContent || '';
-      return { title, link, pub };
-    });
-    return items;
-  }
-
-  function renderNewsList(container, items){
-    if(!container) return;
-    if(!items?.length){
-      container.innerHTML = `<div class="news"><h3>Latest News</h3><div style="color:var(--muted)">—</div></div>`;
-      return;
-    }
-    const rel = (d)=>{
-      const t = new Date(d).getTime();
-      if(!isFinite(t)) return '';
-      const mins = Math.max(1, Math.round((Date.now() - t)/60000));
-      if (mins < 60) return `${mins}m`;
-      const hrs = Math.round(mins/60);
-      if (hrs < 24) return `${hrs}h`;
-      return `${Math.round(hrs/24)}d`;
-    };
-    container.innerHTML = `
-      <div class="news">
-        <h3>Latest News</h3>
-        <ul>
-          ${items.map(it => `
-            <li>
-              <a href="${it.link}" target="_blank" rel="noopener noreferrer">${it.title}</a>
-              ${it.pub ? `<time>· ${rel(it.pub)}</time>` : ''}
-            </li>
-          `).join('')}
-        </ul>
-      </div>`;
-  }
-
-  async function populateNews(rowIdx, item){
-    // Build a broad query: ticker OR company name + "stock"
-    const tkr = yTicker(item.symbol);
-    const name = cleanNameForQuery(item.name);
-    const query = `${tkr} stock OR ${name} stock`;
-    const mount = document.getElementById(`news-${rowIdx}`);
-    try{
-      const items = await fetchNewsItems(query);
-      renderNewsList(mount, items);
-    }catch(e){
-      renderNewsList(mount, []); // graceful fallback
-      console.error('News error', item, e);
-    }
-  }
-</script>
-
-
-    
     /* =============================
        MINI SPARKLINE
        ============================= */
     function drawSparkline(el, series){
-      // series: numbers (last N closes)
       const W = el.clientWidth || 240, H = 44, P = 2;
       const n = series.length;
       const min = Math.min(...series), max = Math.max(...series);
       const x = i => P + (W-2*P) * (i/(n-1 || 1));
-      const y = v => {
-        if(max === min) return H/2;
-        return H - P - (H-2*P) * ((v - min) / (max - min));
-      };
+      const y = v => (max===min) ? H/2 : (H - P - (H-2*P) * ((v - min) / (max - min)));
       let d = '';
       series.forEach((v,i)=>{ d += (i? 'L':'M') + x(i) + ',' + y(v); });
       const fill = `${d} L ${x(n-1)},${H-P} L ${x(0)},${H-P} Z`;
-
       el.innerHTML = `
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
           <path class="fill" d="${fill}"></path>
@@ -363,6 +301,63 @@
     }
 
     /* =============================
+       NEWS (Google News RSS)
+       ============================= */
+    function cleanNameForQuery(name){ return String(name || '').replace(/\(.*?\)/g,'').trim(); }
+    function relTime(d){
+      const t = new Date(d).getTime(); if(!isFinite(t)) return '';
+      const mins = Math.max(1, Math.round((Date.now() - t)/60000));
+      if (mins < 60) return `${mins}m`; const hrs = Math.round(mins/60);
+      if (hrs < 24) return `${hrs}h`; return `${Math.round(hrs/24)}d`;
+    }
+    async function fetchNewsItems(query){
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+      const xmlText = await getRaw(url);
+      const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+      const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
+        const title = node.getElementsByTagName('title')[0]?.textContent || '';
+        const link = node.getElementsByTagName('link')[0]?.textContent || '#';
+        const pub  = node.getElementsByTagName('pubDate')[0]?.textContent || '';
+        const source = node.getElementsByTagName('source')[0]?.textContent || '';
+        return { title, link, pub, source };
+      });
+      return items;
+    }
+    function renderNewsList(container, items){
+      if(!container) return;
+      if(!items?.length){
+        container.innerHTML = `<div class="news"><h3>Latest News</h3><div style="color:var(--muted)">—</div></div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="news">
+          <h3>Latest News</h3>
+          <ul>
+            ${items.map(it => `
+              <li>
+                <a href="${it.link}" target="_blank" rel="noopener noreferrer">${it.title}</a>
+                ${it.source ? ` <span style="color:var(--muted);font-size:11px">(${it.source})</span>` : ''}
+                ${it.pub ? `<time>· ${relTime(it.pub)}</time>` : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </div>`;
+    }
+    async function populateNews(rowIdx, item){
+      const tkr = yTicker(item.symbol);
+      const name = cleanNameForQuery(item.name);
+      const query = `${tkr} stock OR ${name} stock`;
+      const mount = document.getElementById(`news-${rowIdx}`);
+      try{
+        const items = await fetchNewsItems(query);
+        renderNewsList(mount, items);
+      }catch(e){
+        renderNewsList(mount, []);
+        console.error('News error', item, e);
+      }
+    }
+
+    /* =============================
        BUILD GRID ROWS
        ============================= */
     function buildRow(item, idx){
@@ -381,7 +376,6 @@
       const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
       remove.addEventListener('click',()=>{ removeStock(idx); });
       const tbl=document.createElement('table');
-      tbl.style.width='100%'; tbl.style.borderCollapse='collapse'; tbl.style.fontSize='12px';
       tbl.innerHTML = `
         <thead>
           <tr><th>Metric</th><th class="val">Value</th><th class="sig">Signal</th></tr>
@@ -394,73 +388,77 @@
           <tr><td>Next Earnings</td><td id="earn-${idx}" class="val">—</td><td class="sig">—</td></tr>
           <tr><td>Trend (30 bars)</td><td colspan="2"><div id="spark-${idx}" class="spark"></div></td></tr>
         </tbody>`;
-     right.appendChild(hR); 
-right.appendChild(remove); 
-right.appendChild(tbl);
-const newsBox = document.createElement('div');
-newsBox.id = `news-${idx}`;
-newsBox.className = 'news';
-right.appendChild(newsBox);
+      right.appendChild(hR); right.appendChild(remove); right.appendChild(tbl);
 
-grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
+      // News container
+      const newsBox = document.createElement('div');
+      newsBox.id = `news-${idx}`;
+      newsBox.className = 'news';
+      right.appendChild(newsBox);
 
-renderTradingView(cL, item.symbol);
-renderTrends(cM, item.trendTerm);
-populateRadar(idx, item.symbol);
-populateNews(idx, item);   // <— fetch and render 3 latest headlines
+      grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
 
+      renderTradingView(cL, item.symbol);
+      renderTrends(cM, item.trendTerm);
+      populateRadar(idx, item.symbol);
+      populateNews(idx, item);
     }
 
     function renderAll(){
-    grid.innerHTML='';
-    getWatchlist().forEach((it, i)=> buildRow(it, i));
-    updateTimestamp();
-  }
+      grid.innerHTML='';
+      getWatchlist().forEach((it, i)=> buildRow(it, i));
+      updateTimestamp();
+    }
+    function addStock(){
+      const s = document.getElementById('in-symbol').value.trim();
+      const n = document.getElementById('in-name').value.trim() || s;
+      const t = document.getElementById('in-trend').value.trim() || n;
+      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
+      const list = getWatchlist(); list.push({ symbol:s, name:n, trendTerm:t }); setWatchlist(list); renderAll();
+      document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
+    }
+    function removeStock(idx){
+      const list = getWatchlist(); list.splice(idx,1); setWatchlist(list); renderAll();
+    }
+    function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
 
-  function addStock(){
-    const s = document.getElementById('in-symbol').value.trim();
-    const n = document.getElementById('in-name').value.trim() || s;
-    const t = document.getElementById('in-trend').value.trim() || n;
-    if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
-    const list = getWatchlist(); list.push({ symbol:s, name:n, trendTerm:t }); setWatchlist(list); renderAll();
-    document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
-  }
+    function updateTimestamp(){
+      const ts = new Date().toLocaleTimeString();
+      const el = document.getElementById('last-updated');
+      if (!el) return;
+      el.textContent = `Last updated: ${ts}`;
+      el.style.color = 'var(--good)';
+      setTimeout(()=>{ el.style.color='var(--muted)'; }, 1500);
+    }
 
-  function removeStock(idx){
-    const list = getWatchlist(); list.splice(idx,1); setWatchlist(list); renderAll();
-  }
+    function refreshRadarNow(){
+      const list = getWatchlist();
+      list.forEach((it, i)=> {
+        populateRadar(i, it.symbol);
+        populateNews(i, it);
+      });
+      updateTimestamp();
+    }
 
-  function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
+    document.getElementById('btn-add').addEventListener('click', addStock);
+    document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+    document.getElementById('btn-refresh').addEventListener('click', refreshRadarNow);
 
-  function updateTimestamp(){
-    const ts = new Date().toLocaleTimeString();
-    document.getElementById('last-updated').textContent = `Last updated: ${ts}`;
-  }
+    // Initial render
+    renderAll();
 
-  function refreshRadarNow(){
-  const list = getWatchlist();
-  list.forEach((it, i)=> {
-    populateRadar(i, it.symbol);
-    populateNews(i, it);   // refresh headlines too
-  });
-  updateTimestamp();
-}
+    // Auto-refresh radar every 5 minutes
+    setInterval(() => {
+      const list = getWatchlist();
+      list.forEach((it, i)=> populateRadar(i, it.symbol));
+      updateTimestamp();
+    }, REFRESH_MS);
 
-
-  document.getElementById('btn-add').addEventListener('click', addStock);
-  document.getElementById('btn-reset').addEventListener('click', resetDefaults);
-  document.getElementById('btn-refresh').addEventListener('click', refreshRadarNow);
-
-  // Initial render
-  renderAll();
-
-  // Auto-refresh the radar every 5 minutes
- setInterval(() => {
-  const list = getWatchlist();
-  list.forEach((it, i)=> populateNews(i, it));
-}, 15 * 60 * 1000);
-</script>
+    // Auto-refresh news every 15 minutes
+    setInterval(() => {
+      const list = getWatchlist();
+      list.forEach((it, i)=> populateNews(i, it));
+    }, NEWS_REFRESH_MS);
+  </script>
 </body>
 </html>
-
-
