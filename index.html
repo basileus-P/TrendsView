@@ -51,6 +51,16 @@
   </div>
 </header>
 
+  <style>
+  /* ...existing styles... */
+  .news { margin-top: 10px; }
+  .news h3 { margin: 8px 0 4px; font-size:12px; color:var(--muted); }
+  .news ul { list-style:none; padding:0; margin:0; }
+  .news li { margin:6px 0; }
+  .news a { color:#8fb6ff; text-decoration:none; }
+  .news a:hover { text-decoration:underline; }
+  .news time { color:var(--muted); font-size:11px; margin-left:6px; }
+</style>
   <div id="grid" class="container"></div>
 
   <!-- Google Trends embed loader -->
@@ -177,7 +187,73 @@
       const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
       return getJSON(url);
     }
+<script>
+  // ---- NEWS (Google News RSS via our proxy) ----
+  function cleanNameForQuery(name){
+    // strip "(TICKER)" etc. from display name
+    return String(name || '').replace(/\(.*?\)/g,'').trim();
+  }
 
+  async function fetchNewsItems(query){
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+    const xmlText = await getRaw(url); // uses the resilient proxy helper you already have
+    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
+      const title = node.getElementsByTagName('title')[0]?.textContent || '';
+      const link = node.getElementsByTagName('link')[0]?.textContent || '#';
+      const pub  = node.getElementsByTagName('pubDate')[0]?.textContent || '';
+      return { title, link, pub };
+    });
+    return items;
+  }
+
+  function renderNewsList(container, items){
+    if(!container) return;
+    if(!items?.length){
+      container.innerHTML = `<div class="news"><h3>Latest News</h3><div style="color:var(--muted)">—</div></div>`;
+      return;
+    }
+    const rel = (d)=>{
+      const t = new Date(d).getTime();
+      if(!isFinite(t)) return '';
+      const mins = Math.max(1, Math.round((Date.now() - t)/60000));
+      if (mins < 60) return `${mins}m`;
+      const hrs = Math.round(mins/60);
+      if (hrs < 24) return `${hrs}h`;
+      return `${Math.round(hrs/24)}d`;
+    };
+    container.innerHTML = `
+      <div class="news">
+        <h3>Latest News</h3>
+        <ul>
+          ${items.map(it => `
+            <li>
+              <a href="${it.link}" target="_blank" rel="noopener noreferrer">${it.title}</a>
+              ${it.pub ? `<time>· ${rel(it.pub)}</time>` : ''}
+            </li>
+          `).join('')}
+        </ul>
+      </div>`;
+  }
+
+  async function populateNews(rowIdx, item){
+    // Build a broad query: ticker OR company name + "stock"
+    const tkr = yTicker(item.symbol);
+    const name = cleanNameForQuery(item.name);
+    const query = `${tkr} stock OR ${name} stock`;
+    const mount = document.getElementById(`news-${rowIdx}`);
+    try{
+      const items = await fetchNewsItems(query);
+      renderNewsList(mount, items);
+    }catch(e){
+      renderNewsList(mount, []); // graceful fallback
+      console.error('News error', item, e);
+    }
+  }
+</script>
+
+
+    
     /* =============================
        MINI SPARKLINE
        ============================= */
@@ -318,13 +394,21 @@
           <tr><td>Next Earnings</td><td id="earn-${idx}" class="val">—</td><td class="sig">—</td></tr>
           <tr><td>Trend (30 bars)</td><td colspan="2"><div id="spark-${idx}" class="spark"></div></td></tr>
         </tbody>`;
-      right.appendChild(hR); right.appendChild(remove); right.appendChild(tbl);
+     right.appendChild(hR); 
+right.appendChild(remove); 
+right.appendChild(tbl);
+const newsBox = document.createElement('div');
+newsBox.id = `news-${idx}`;
+newsBox.className = 'news';
+right.appendChild(newsBox);
 
-      grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
+grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
 
-      renderTradingView(cL, item.symbol);
-      renderTrends(cM, item.trendTerm);
-      populateRadar(idx, item.symbol);
+renderTradingView(cL, item.symbol);
+renderTrends(cM, item.trendTerm);
+populateRadar(idx, item.symbol);
+populateNews(idx, item);   // <— fetch and render 3 latest headlines
+
     }
 
     function renderAll(){
@@ -354,10 +438,14 @@
   }
 
   function refreshRadarNow(){
-    const list = getWatchlist();
-    list.forEach((it, i)=> populateRadar(i, it.symbol));
-    updateTimestamp();
-  }
+  const list = getWatchlist();
+  list.forEach((it, i)=> {
+    populateRadar(i, it.symbol);
+    populateNews(i, it);   // refresh headlines too
+  });
+  updateTimestamp();
+}
+
 
   document.getElementById('btn-add').addEventListener('click', addStock);
   document.getElementById('btn-reset').addEventListener('click', resetDefaults);
@@ -367,8 +455,12 @@
   renderAll();
 
   // Auto-refresh the radar every 5 minutes
-  setInterval(refreshRadarNow, REFRESH_MS);
+ setInterval(() => {
+  const list = getWatchlist();
+  list.forEach((it, i)=> populateNews(i, it));
+}, 15 * 60 * 1000);
 </script>
 </body>
 </html>
+
 
