@@ -41,6 +41,8 @@
     .spark .fill{fill:rgba(143,182,255,0.12);stroke:none}
     .spark .axis{stroke:#233046;stroke-width:1}
 
+    .strength-badge{position:absolute;top:10px;left:10px;background:#0e1522;border:1px solid var(--border);padding:4px 8px;border-radius:8px;font-size:12px;color:var(--muted)}
+    .strength-badge strong{color:#fff}
     .news{margin-top:10px}
     .news h3{margin:8px 0 4px;font-size:12px;color:var(--muted)}
     .news ul{list-style:none;padding:0;margin:0}
@@ -74,19 +76,17 @@
   <!-- Google Trends embed loader -->
   <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
   <script>
-    /* =============================
-       CONFIG
-       ============================= */
+    /* ============== CONFIG ============== */
     const DEFAULT_WATCHLIST = [
       { symbol: "NASDAQ:MVIS", name: "MicroVision (MVIS)", trendTerm: "MicroVision" },
       { symbol: "NASDAQ:QSI",  name: "Quantum-Si (QSI)",   trendTerm: "Quantum-Si" },
       { symbol: "NASDAQ:REKR", name: "Rekor Systems (REKR)", trendTerm: "Rekor Systems" }
     ];
-    const STORAGE_KEY = 'WATCHLIST_V1';
-    const TRENDS_GEO = "";            // Worldwide
-    const TRENDS_TIME = "today 1-m";  // last 1 month
+    const STORAGE_KEY = 'WATCHLIST_V2'; // bumped since we sort order now
+    const TRENDS_GEO = "";             // Worldwide
+    const TRENDS_TIME = "today 1-m";   // last 1 month (per your request)
 
-    // Breakout radar params
+    // Breakout metric params
     const BENCHMARK = "QQQ";  // for RS calc
     const RS_LOOKBACK = 10;
     const AVG_VOL_WINDOW = 20;
@@ -94,20 +94,33 @@
     const MA50_WINDOW = 50;
     const MA200_WINDOW = 200;
 
-    // thresholds (tune as you like)
+    // thresholds (you can tune)
     const THRESHOLDS = {
       volVsAvg: 1.5,          // >= 1.5x avg volume
       nearHighPct: -0.10,     // within 10% of 30d high
       rsOutperformance: 0.01  // RS >= +1% vs benchmark
     };
 
-    // auto-refresh (milliseconds)
-    const REFRESH_MS = 5 * 60 * 1000;   // 5 minutes (radar)
-    const NEWS_REFRESH_MS = 15 * 60 * 1000; // 15 minutes (news)
+    // Strength score weights (sum ~= 1.0)
+    const SCORE_WEIGHTS = {
+      volVsAvg: 0.35,
+      rs:       0.25,
+      nearHigh: 0.25,
+      maStack:  0.15
+    };
 
-    /* =============================
-       STORAGE
-       ============================= */
+    // Normalization caps (what counts as “full score”)
+    const SCORE_CAPS = {
+      volVsAvg: 3.0,   // 3x volume saturates the vol component
+      rs:       0.05,  // +5% outperformance over 10d = full score
+      nearHigh: 0.10   // within 10% of 30d high = full score
+    };
+
+    // auto-refresh timers
+    const REFRESH_MS = 5 * 60 * 1000;        // 5 minutes (radar)
+    const NEWS_REFRESH_MS = 15 * 60 * 1000;  // 15 minutes (news)
+
+    /* ============== STORAGE ============== */
     function getWatchlist(){
       try{
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -121,9 +134,7 @@
       try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{}
     }
 
-    /* =============================
-       UI HELPERS
-       ============================= */
+    /* ============== UI HELPERS ============== */
     const grid = document.getElementById('grid');
 
     function renderTradingView(container, symbol){
@@ -162,9 +173,7 @@
       }
     }
 
-    /* =============================
-       RESILIENT CORS PROXIES (Yahoo + RSS)
-       ============================= */
+    /* ============== RESILIENT CORS PROXIES (Yahoo + RSS) ============== */
     async function getRaw(url) {
       const candidates = [
         'https://cors.isomorphic-git.org/' + url,
@@ -185,7 +194,7 @@
     async function getJSON(url) {
       const txt = await getRaw(url);
       try { return JSON.parse(txt); }
-      catch (e) { throw new Error('bad JSON: ' + txt.slice(0,80)); }
+      catch (e) { throw new Error('bad JSON: ' + txt.slice(0,120)); }
     }
     function yTicker(sym){ return String(sym || '').split(':').pop().trim().toUpperCase(); }
     async function yahooChart(ticker, range='1y', interval='1d'){
@@ -197,9 +206,7 @@
       return getJSON(url);
     }
 
-    /* =============================
-       MINI SPARKLINE
-       ============================= */
+    /* ============== MINI SPARKLINE ============== */
     function drawSparkline(el, series){
       const W = el.clientWidth || 240, H = 44, P = 2;
       const n = series.length;
@@ -217,92 +224,75 @@
         </svg>`;
     }
 
-    /* =============================
-       BREAKOUT RADAR (Yahoo)
-       ============================= */
-    function pctFmt(x){ return (x*100).toFixed(1)+'%'; }
-    function setSig(elValue, elSig, passed){
-      elSig.textContent = passed ? '✅' : '—';
-      elSig.className = 'sig ' + (passed ? 'ok' : 'ko');
-      elValue.className = 'val ' + (passed ? 'ok' : 'ko');
-    }
+    /* ============== METRICS + STRENGTH COMPUTATION ============== */
     function sma(arr,n){ const seg=arr.slice(-n); return seg.reduce((a,b)=>a+b,0)/Math.max(1,seg.length); }
+    function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 
-    async function populateRadar(rowIdx, symbol){
-      const t = yTicker(symbol);
-      try{
-        const [ch, bench] = await Promise.all([
-          yahooChart(t, '1y', '1d'),
-          yahooChart(BENCHMARK, '6mo', '1d')
-        ]);
+    function computeStrength(parts){
+      // Normalize to 0..1 and weight
+      const volNorm = clamp(parts.volVsAvg / SCORE_CAPS.volVsAvg, 0, 1);
+      const rsNorm  = clamp(parts.rs / SCORE_CAPS.rs, 0, 1);
+      const near    = Math.max(0, -parts.nearHigh); // positive “distance below high”
+      const nhNorm  = clamp(1 - (near / SCORE_CAPS.nearHigh), 0, 1); // closer to high => higher score
+      const maNorm  = (parts.above50 ? 0.5 : 0) + (parts.above200 ? 0.5 : 0);
 
-        const c = ch?.chart?.result?.[0];
-        const q = c?.indicators?.quote?.[0];
-        const closes  = (q?.close  || []).filter(v => v != null);
-        const volumes = (q?.volume || []).filter(v => v != null);
-        if (closes.length === 0 || volumes.length === 0) throw new Error('no price/volume');
+      const score01 =
+        volNorm   * SCORE_WEIGHTS.volVsAvg +
+        rsNorm    * SCORE_WEIGHTS.rs +
+        nhNorm    * SCORE_WEIGHTS.nearHigh +
+        maNorm    * SCORE_WEIGHTS.maStack;
 
-        // Sparkline (last 30 bars)
-        const spark = document.getElementById(`spark-${rowIdx}`);
-        if (spark) drawSparkline(spark, closes.slice(-30));
-
-        const price = closes[closes.length-1];
-
-        // Volume vs 20d avg
-        const vCell = document.getElementById(`vavg-${rowIdx}`);
-        const vSig  = document.getElementById(`vavg-s-${rowIdx}`);
-        const recentVol = volumes[volumes.length-1];
-        const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0) / Math.max(1, Math.min(AVG_VOL_WINDOW, volumes.length));
-        const volVs = recentVol / (avgVol || 1);
-        vCell.textContent = volVs.toFixed(2)+'x';
-        setSig(vCell, vSig, volVs >= THRESHOLDS.volVsAvg);
-
-        // RS vs QQQ (10d)
-        const rCell = document.getElementById(`rs-${rowIdx}`);
-        const rSig  = document.getElementById(`rs-s-${rowIdx}`);
-        const bc = bench?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null) || [];
-        const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
-        const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
-        const rs = (price/p0) / ((bc[bc.length-1]||p0)/(b0||bc[0]||1)) - 1;
-        rCell.textContent = pctFmt(rs);
-        setSig(rCell, rSig, rs >= THRESHOLDS.rsOutperformance);
-
-        // Price vs 30d high
-        const hCell = document.getElementById(`phigh-${rowIdx}`);
-        const hSig  = document.getElementById(`phigh-s-${rowIdx}`);
-        const windowCloses = closes.slice(-HIGH_LOOKBACK);
-        const high = Math.max(...windowCloses);
-        const nearHigh = price/high - 1;  // negative if below high
-        hCell.textContent = pctFmt(nearHigh);
-        setSig(hCell, hSig, nearHigh >= THRESHOLDS.nearHighPct);
-
-        // MAs
-        const mCell = document.getElementById(`ma-${rowIdx}`);
-        const mSig  = document.getElementById(`ma-s-${rowIdx}`);
-        const ma50  = sma(closes, MA50_WINDOW);
-        const ma200 = sma(closes, MA200_WINDOW);
-        const above50 = price>ma50, above200 = price>ma200;
-        mCell.textContent = `${above50?'Above':'Below'} 50d / ${above200?'Above':'Below'} 200d`;
-        setSig(mCell, mSig, above50 && above200);
-
-        // Earnings (best-effort)
-        const eCell = document.getElementById(`earn-${rowIdx}`);
-        try{
-          const ej = await yahooEarnings(t);
-          const raw = ej?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
-          eCell.textContent = raw ? new Date(raw*1000).toISOString().slice(0,10) : '—';
-        }catch{ eCell.textContent = '—'; }
-
-      }catch(err){
-        ['vavg','vavg-s','rs','rs-s','phigh','phigh-s','ma','ma-s','earn']
-          .forEach(id => { const el=document.getElementById(`${id}-${rowIdx}`); if(el) { el.textContent='—'; el.className = el.className?.replace(/\bok\b/g,'ko'); } });
-        console.error('Radar error', t, err);
-      }
+      return Math.round(score01 * 100);
     }
 
-    /* =============================
-       NEWS (Google News RSS)
-       ============================= */
+    async function fetchBenchmarkCloses(){
+      const b = await yahooChart(BENCHMARK, '6mo', '1d');
+      return (b?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || []).filter(v=>v!=null);
+    }
+
+    async function computeMetricsFor(symbol, benchCloses){
+      const t = yTicker(symbol);
+      const ch = await yahooChart(t, '1y', '1d');
+      const c = ch?.chart?.result?.[0];
+      const q = c?.indicators?.quote?.[0];
+      const closes  = (q?.close  || []).filter(v=>v!=null);
+      const volumes = (q?.volume || []).filter(v=>v!=null);
+      if (!closes.length || !volumes.length) throw new Error('no data for '+t);
+
+      const price = closes[closes.length-1];
+
+      // Volume vs 20d avg
+      const recentVol = volumes[volumes.length-1];
+      const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0)/Math.max(1, Math.min(AVG_VOL_WINDOW, volumes.length));
+      const volVsAvg = recentVol / (avgVol || 1);
+
+      // RS vs benchmark
+      const bc = benchCloses;
+      const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
+      const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
+      const rs = (price/p0) / ((bc[bc.length-1]||p0)/(b0||bc[0]||1)) - 1;
+
+      // Price vs 30d high
+      const windowCloses = closes.slice(-HIGH_LOOKBACK);
+      const high = Math.max(...windowCloses);
+      const nearHigh = price/high - 1; // negative if under the high
+
+      // MAs
+      const ma50  = sma(closes, MA50_WINDOW);
+      const ma200 = sma(closes, MA200_WINDOW);
+      const above50 = price > ma50, above200 = price > ma200;
+
+      // Strength
+      const strength = computeStrength({ volVsAvg, rs, nearHigh, above50, above200 });
+
+      return {
+        ticker: t, closes, volumes, price,
+        volVsAvg, rs, nearHigh, above50, above200,
+        strength
+      };
+    }
+
+    /* ============== NEWS (Google News RSS) ============== */
     function cleanNameForQuery(name){ return String(name || '').replace(/\(.*?\)/g,'').trim(); }
     function relTime(d){
       const t = new Date(d).getTime(); if(!isFinite(t)) return '';
@@ -357,24 +347,25 @@
       }
     }
 
-    /* =============================
-       BUILD GRID ROWS
-       ============================= */
-    function buildRow(item, idx){
+    /* ============== BUILD (SORTED BY STRENGTH) ============== */
+    function buildRow(item, idx, metrics){
       const left=document.createElement('div'); left.className='card';
       const hL=document.createElement('h2'); hL.textContent=`${item.name} — Price & Chart`;
       const cL=document.createElement('div'); cL.className='chart';
       left.appendChild(hL); left.appendChild(cL);
 
       const mid=document.createElement('div'); mid.className='card';
-      const hM=document.createElement('h2'); hM.textContent=`Google Trends — “${item.trendTerm}” (3 months, Worldwide)`;
+      const hM=document.createElement('h2'); hM.textContent=`Google Trends — “${item.trendTerm}” (1 month, Worldwide)`;
       const cM=document.createElement('div'); cM.className='trend'; cM.id=`trend-${idx}`;
       mid.appendChild(hM); mid.appendChild(cM);
 
       const right=document.createElement('div'); right.className='card';
+      const strength=document.createElement('div'); strength.className='strength-badge';
+      strength.innerHTML = `Strength: <strong>${metrics.strength}</strong>`;
       const hR=document.createElement('h2'); hR.textContent='Breakout Radar';
       const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
-      remove.addEventListener('click',()=>{ removeStock(idx); });
+      remove.addEventListener('click',()=>{ removeStockByName(item.name); });
+
       const tbl=document.createElement('table');
       tbl.innerHTML = `
         <thead>
@@ -388,7 +379,8 @@
           <tr><td>Next Earnings</td><td id="earn-${idx}" class="val">—</td><td class="sig">—</td></tr>
           <tr><td>Trend (30 bars)</td><td colspan="2"><div id="spark-${idx}" class="spark"></div></td></tr>
         </tbody>`;
-      right.appendChild(hR); right.appendChild(remove); right.appendChild(tbl);
+
+      right.appendChild(strength); right.appendChild(hR); right.appendChild(remove); right.appendChild(tbl);
 
       // News container
       const newsBox = document.createElement('div');
@@ -400,27 +392,52 @@
 
       renderTradingView(cL, item.symbol);
       renderTrends(cM, item.trendTerm);
-      populateRadar(idx, item.symbol);
+
+      // Fill radar from provided metrics (no re-fetch)
+      const closes = metrics.closes;
+      const price  = metrics.price;
+      const vCell = document.getElementById(`vavg-${idx}`), vSig = document.getElementById(`vavg-s-${idx}`);
+      const rCell = document.getElementById(`rs-${idx}`),   rSig = document.getElementById(`rs-s-${idx}`);
+      const hCell = document.getElementById(`phigh-${idx}`), hSig = document.getElementById(`phigh-s-${idx}`);
+      const mCell = document.getElementById(`ma-${idx}`),    mSig = document.getElementById(`ma-s-${idx}`);
+
+      // sparkline
+      drawSparkline(document.getElementById(`spark-${idx}`), closes.slice(-30));
+
+      // volume
+      vCell.textContent = metrics.volVsAvg.toFixed(2)+'x';
+      setSig(vCell, vSig, metrics.volVsAvg >= THRESHOLDS.volVsAvg);
+
+      // RS
+      rCell.textContent = (metrics.rs*100).toFixed(1)+'%';
+      setSig(rCell, rSig, metrics.rs >= THRESHOLDS.rsOutperformance);
+
+      // 30d high proximity
+      hCell.textContent = (metrics.nearHigh*100).toFixed(1)+'%';
+      setSig(hCell, hSig, metrics.nearHigh >= THRESHOLDS.nearHighPct);
+
+      // MA stack
+      mCell.textContent = `${metrics.above50?'Above':'Below'} 50d / ${metrics.above200?'Above':'Below'} 200d`;
+      setSig(mCell, mSig, metrics.above50 && metrics.above200);
+
+      // earnings (best-effort async)
+      (async ()=>{
+        try{
+          const ej = await yahooEarnings(metrics.ticker);
+          const raw = ej?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
+          document.getElementById(`earn-${idx}`).textContent = raw ? new Date(raw*1000).toISOString().slice(0,10) : '—';
+        }catch{ document.getElementById(`earn-${idx}`).textContent = '—'; }
+      })();
+
+      // news
       populateNews(idx, item);
     }
 
-    function renderAll(){
-      grid.innerHTML='';
-      getWatchlist().forEach((it, i)=> buildRow(it, i));
-      updateTimestamp();
+    function removeStockByName(name){
+      const list = getWatchlist();
+      const idx = list.findIndex(x => x.name === name);
+      if(idx>=0){ list.splice(idx,1); setWatchlist(list); renderAllSorted(); }
     }
-    function addStock(){
-      const s = document.getElementById('in-symbol').value.trim();
-      const n = document.getElementById('in-name').value.trim() || s;
-      const t = document.getElementById('in-trend').value.trim() || n;
-      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
-      const list = getWatchlist(); list.push({ symbol:s, name:n, trendTerm:t }); setWatchlist(list); renderAll();
-      document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
-    }
-    function removeStock(idx){
-      const list = getWatchlist(); list.splice(idx,1); setWatchlist(list); renderAll();
-    }
-    function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
 
     function updateTimestamp(){
       const ts = new Date().toLocaleTimeString();
@@ -431,35 +448,67 @@
       setTimeout(()=>{ el.style.color='var(--muted)'; }, 1500);
     }
 
-    function refreshRadarNow(){
+    async function buildSortedMetrics(list){
+      const benchCloses = await fetchBenchmarkCloses();
+      const results = [];
+      for (const it of list){
+        try{
+          const m = await computeMetricsFor(it.symbol, benchCloses);
+          results.push({ item: it, metrics: m });
+        }catch(e){
+          console.error('metrics error', it, e);
+          // still push with minimal metrics so it renders
+          results.push({ item: it, metrics: { strength: 0, closes: [], price: 0, volVsAvg:0, rs:0, nearHigh:-1, above50:false, above200:false, ticker:yTicker(it.symbol) } });
+        }
+      }
+      // sort descending by strength
+      results.sort((a,b)=> b.metrics.strength - a.metrics.strength);
+      return results;
+    }
+
+    async function renderAllSorted(){
+      grid.innerHTML='';
+
       const list = getWatchlist();
-      list.forEach((it, i)=> {
-        populateRadar(i, it.symbol);
-        populateNews(i, it);
-      });
+      const results = await buildSortedMetrics(list);
+
+      // Rebuild grid in sorted order
+      results.forEach((res, i) => buildRow(res.item, i, res.metrics));
       updateTimestamp();
+    }
+
+    function addStock(){
+      const s = document.getElementById('in-symbol').value.trim();
+      const n = document.getElementById('in-name').value.trim() || s;
+      const t = document.getElementById('in-trend').value.trim() || n;
+      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
+      const list = getWatchlist(); list.push({ symbol:s, name:n, trendTerm:t }); setWatchlist(list);
+      renderAllSorted();
+      document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
+    }
+
+    function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAllSorted(); }
+
+    function refreshNow(){
+      // Full recompute + resort
+      renderAllSorted();
     }
 
     document.getElementById('btn-add').addEventListener('click', addStock);
     document.getElementById('btn-reset').addEventListener('click', resetDefaults);
-    document.getElementById('btn-refresh').addEventListener('click', refreshRadarNow);
+    document.getElementById('btn-refresh').addEventListener('click', refreshNow);
 
-    // Initial render
-    renderAll();
+    // Initial render (sorted)
+    renderAllSorted();
 
-    // Auto-refresh radar every 5 minutes
-    setInterval(() => {
-      const list = getWatchlist();
-      list.forEach((it, i)=> populateRadar(i, it.symbol));
-      updateTimestamp();
-    }, REFRESH_MS);
+    // Auto-refresh radar + resort every 5 minutes
+    setInterval(renderAllSorted, REFRESH_MS);
 
-    // Auto-refresh news every 15 minutes
-    setInterval(() => {
+    // Auto-refresh news every 15 minutes (runs inside render too, but keep it in case of mid-cycle)
+    setInterval(async () => {
       const list = getWatchlist();
       list.forEach((it, i)=> populateNews(i, it));
     }, NEWS_REFRESH_MS);
   </script>
 </body>
 </html>
-
