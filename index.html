@@ -1,69 +1,49 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VALUE — Intrinsic Tracking</title>
-  <style>
-    :root{
-      --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8;
-      --good:#19c37d; --bad:#e26d6d; --accent:#8fb6ff;
-    }
-    html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-    /* Top tabs (so VALUE lives alongside INDEX/SCREENERS/SETTINGS) */
-    .tabs{display:flex;gap:8px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:#0a1018;position:sticky;top:0;z-index:5}
-    .tab{padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:#0f1826;color:var(--muted);text-decoration:none}
-    .tab.active{background:#172335;color:#fff;border-color:#223146}
-    header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-    h1{margin:0;font-size:18px}
-    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .toolbar input{background:#0e1522;border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text)}
-    .toolbar button{background:#152235;border:1px solid var(--border);color:#e6eef7;padding:8px 12px;border-radius:10px;cursor:pointer}
-    .toolbar button:hover{filter:brightness(1.1)}
-    #last-updated{color:var(--muted);font-size:12px}
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Breakthrough — Stocks + Google Trends + Radar</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#111826;--border:#1c2633;--text:#e6eef7;--muted:#9fb3c8;--good:#19c37d;--bad:#e26d6d;--dim:#6b7c91}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#0a1018;position:sticky;top:0;z-index:5}
+  h1{margin:0;font-size:18px}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .toolbar input{background:#0e1522;border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text)}
+  .toolbar button{background:#152235;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+  .toolbar button:hover{filter:brightness(1.1)}
+  #last-updated{color:var(--muted);font-size:12px}
 
-    .container{display:flex;flex-direction:column;gap:16px;padding:16px}
-    .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative}
-    .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600}
-    .price-tile{display:flex;align-items:baseline;gap:10px}
-    .price-tile .big{font-size:24px;font-weight:700}
-    .price-tile .chg{font-size:12px}
-    .chg.up{color:var(--good)} .chg.down{color:var(--bad)}
+  .container{display:flex;flex-direction:column;gap:16px;padding:16px}
+  .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative}
+  .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600}
+  .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
+  .remove-btn:hover{filter:brightness(1.1)}
 
-    .val-table{width:100%;border-collapse:collapse;margin-top:6px}
-    .val-table td{padding:4px 0;border-color:var(--border)}
-    .val-kv{display:flex;justify-content:space-between;gap:12px}
-    .val-up{font-weight:700}
-    .up{color:var(--good)} .down{color:var(--bad)}
+  /* Radar table */
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{border-bottom:1px solid var(--border);padding:6px 4px;color:var(--text)}
+  th{color:var(--muted);text-align:left}
+  td.v{text-align:right}
+  td.s{text-align:center}
+  .sig{display:inline-block;width:10px;height:10px;border-radius:50%}
+  .sig.good{background:var(--good)} .sig.bad{background:var(--bad)} .sig.neu{background:#3b475a}
 
-    .news{margin-top:10px}
-    .news h3{margin:10px 0 6px;font-size:12px;color:var(--muted)}
-    .news ul{list-style:none;margin:0;padding:0}
-    .news li{margin:6px 0}
-    .news a{color:var(--accent);text-decoration:none}
-    .news a:hover{text-decoration:underline}
-    .news time{color:var(--muted);font-size:11px;margin-left:6px}
+  /* sparkline */
+  .spark{height:32px;width:100%}
 
-    .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
-    .remove-btn:hover{filter:brightness(1.1)}
-    @media (max-width:980px){.row{grid-template-columns:1fr}}
-  </style>
+  @media(max-width:980px){.row{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
-  <nav class="tabs">
-    <a class="tab" href="index.html">INDEX</a>
-    <a class="tab" href="screeners.html">SCREENERS</a>
-    <a class="tab" href="settings.html">SETTINGS</a>
-    <span class="tab active">VALUE</span>
-  </nav>
-
   <header>
-    <h1>VALUE — Current Price • Google Trends (1m) • Intrinsic Valuation + News</h1>
+    <h1>Stocks (left) • Google Trends (middle) • Breakout Radar (right)</h1>
     <div class="toolbar">
-      <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:NU)" size="28" />
-      <input id="in-name" placeholder="Display name" size="20" />
+      <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26" />
+      <input id="in-name" placeholder="Display name" size="18" />
       <input id="in-trend" placeholder="Google Trends term" size="18" />
       <button id="btn-add">Add / Update</button>
       <button id="btn-reset">Reset defaults</button>
@@ -77,28 +57,39 @@
   <!-- Google Trends embed loader -->
   <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
   <script>
-    /* ===============================
-       CONFIG
-       =============================== */
-    const STORAGE_KEY = 'VALUE_WATCHLIST_V1';
+    /**********************
+     * CONFIG
+     **********************/
+    const STORAGE_KEY = 'WATCHLIST_BREAKTHROUGH_V3';
+    // set any defaults you like here
     const DEFAULT_WATCHLIST = [
-      { symbol: "NYSE:NU",  name: "Nu Holdings (NU)",     trendTerm: "Nubank" },
-      { symbol: "NASDAQ:OPEN", name: "Opendoor (OPEN)",   trendTerm: "Opendoor" },
-      { symbol: "NASDAQ:APLD", name: "Applied Digital",   trendTerm: "Applied Digital" }
+      { symbol:"NASDAQ:MVIS", name:"MicroVision (MVIS)", trendTerm:"MicroVision" },
+      { symbol:"NASDAQ:QSI",  name:"Quantum-Si (QSI)",   trendTerm:"Quantum-Si" },
+      { symbol:"NASDAQ:REKR", name:"Rekor Systems (REKR)", trendTerm:"Rekor Systems" }
     ];
-    const TRENDS_GEO  = "";            // worldwide
-    const TRENDS_TIME = "today 1-m";   // last 1 month
 
-    // Valuation constants (conservative defaults; can be made configurable later)
-    const TAX_RATE = 0.25;
-    const R_DEFAULT = 0.11;    // required return baseline; we’ll adjust by size if needed
-    const G1_MAX = 0.08;       // FCF growth cap in perpetuity leg (safety)
-    const G0_TERM = 0.02;      // terminal growth
-    const REFRESH_MS_VAL = 10 * 60 * 1000; // fundamentals/news refresh every 10m
+    const TRENDS_GEO  = "";
+    const TRENDS_TIME = "today 3-m";
+    const BENCHMARK   = "QQQ";      // Relative strength baseline
+    const RS_LOOKBACK = 10;         // days
+    const AVG_VOL_WIN = 20;
+    const HIGH_LOOKBK = 30;
+    const MA50_WIN    = 50;
+    const MA200_WIN   = 200;
 
-    /* ===============================
-       STORAGE
-       =============================== */
+    // thresholds for signal coloring
+    const THRESH = {
+      volVsAvg: 2.0,          // >= 2x avg volume
+      rsOutperf: 0.02,        // >= +2% vs QQQ over lookback
+      nearHighPct: -0.05      // within 5% of 30d high
+    };
+
+    // refresh cadence
+    const AUTO_REFRESH_MS = 5 * 60 * 1000;
+
+    /**********************
+     * STORAGE HELPERS
+     **********************/
     function getWatchlist(){
       try{
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -109,200 +100,59 @@
       }catch{ return DEFAULT_WATCHLIST.slice(); }
     }
     function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
-    function yTicker(sym){ return String(sym || '').split(':').pop().trim().toUpperCase(); }
-    function rowIdFromSymbol(symbol){ return 'row-' + yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
-    function cid(rid, key){ return `${key}-${rid}`; }
+    function yTicker(sym){ return String(sym||'').split(':').pop().trim().toUpperCase(); }
 
-    /* ===============================
-       RESILIENT FETCHING (CORS-safe)
-       =============================== */
-    async function getRaw(url) {
-      const proxies = [
-        'https://cors.isomorphic-git.org/' + url,
-        'https://corsproxy.io/?' + encodeURIComponent(url),
-        'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
-      ];
-      const addBuster = u => u + (u.includes('?') ? '&' : '?') + 'noCache=' + Date.now();
-      let lastErr;
-      for (const p of proxies) {
-        try {
-          const r = await fetch(addBuster(p));
-          if (!r.ok) throw new Error('status '+r.status);
-          return await r.text();
-        } catch(e){ lastErr = e; }
-      }
-      throw lastErr || new Error('all proxies failed');
+    /**********************
+     * STQQ — ST﻿OOQ FETCHERS (NO CORS ISSUES)
+     **********************/
+    function stooqSymbol(sym){
+      const t = String(sym || '').split(':').pop().trim().toLowerCase();
+      return `${t}.us`;
     }
-    async function getJSON(url){
-      const txt = await getRaw(url);
-      try { return JSON.parse(txt); }
-      catch(e){ throw new Error('bad JSON: '+txt.slice(0,140)); }
-    }
-
-    /* ===============================
-       YAHOO FUNDAMENTALS
-       =============================== */
-    async function fetchYahooQuoteSummary(ticker){
-      // Pull many modules at once; Yahoo returns only those available
-      const modules = [
-        'price','financialData','defaultKeyStatistics',
-        'incomeStatementHistoryQuarterly','cashflowStatementHistory',
-        'balanceSheetHistory'
-      ].join(',');
-      const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${modules}`;
-      return getJSON(url);
+    async function fetchStooqDailyCSV(sym){
+      const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
+      const r = await fetch(url, {mode:'cors'});
+      if(!r.ok) throw new Error('stooq fetch failed ('+r.status+')');
+      const text = await r.text();
+      const lines = text.trim().split('\n');
+      if(lines.length<2) throw new Error('stooq empty');
+      const hdr = lines.shift().split(',');
+      const idx = Object.fromEntries(hdr.map((h,i)=>[h,i]));
+      return lines.map(line=>{
+        const c = line.split(',');
+        return {
+          date: c[idx['Date']],
+          open: +c[idx['Open']],
+          high: +c[idx['High']],
+          low:  +c[idx['Low']],
+          close:+c[idx['Close']],
+          volume:+c[idx['Volume']]
+        };
+      }).filter(r=>Number.isFinite(r.close)&&Number.isFinite(r.volume));
     }
 
-    function num(raw){ return (raw && typeof raw.raw==='number') ? raw.raw : null; }
-
-    function sumRaw(arr, key, n){
-      if(!Array.isArray(arr)) return null;
-      let s=0, c=0;
-      for (let i=0;i<Math.min(n, arr.length);i++){
-        const v = num(arr[i]?.[key]);
-        if(typeof v==='number'){ s+=v; c++; }
-      }
-      return c ? s : null;
-    }
-
-    async function getFundamentals(ticker){
-      // returns { price, change, revenueTTM, opIncTTM, fcfTTM, cash, debt, sharesOut, netCash }
-      const j = await fetchYahooQuoteSummary(ticker);
-      const res = j?.quoteSummary?.result?.[0] || {};
-
-      const price = num(res.price?.regularMarketPrice);
-      const change = num(res.price?.regularMarketChangePercent); // % change
-      const sharesOut = num(res.defaultKeyStatistics?.sharesOutstanding)
-                     || num(res.price?.sharesOutstanding);
-
-      // Revenue TTM from quarterly income statements (sum last 4)
-      const incQ = res.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
-      const revenueTTM = sumRaw(incQ, 'totalRevenue', 4);
-      const opIncTTM   = sumRaw(incQ, 'operatingIncome', 4);
-
-      // FCF TTM — prefer cashflowStatementHistory (annual TTM-ish best effort)
-      const cf = res.cashflowStatementHistory?.cashflowStatements || [];
-      const fcfTTM = num(cf[0]?.freeCashFlow) ?? num(res.financialData?.freeCashflow);
-
-      // Cash & Debt
-      const fin = res.financialData || {};
-      let cash = num(fin.totalCash) ?? null;
-      let debt = num(fin.totalDebt) ?? null;
-
-      // If financialData missing, try balance sheet last statement
-      const bs = res.balanceSheetHistory?.balanceSheetStatements || [];
-      if (cash==null) cash = num(bs[0]?.cash) ?? num(bs[0]?.cashAndCashEquivalents);
-      if (debt==null) debt = num(bs[0]?.shortLongTermDebtTotal) ?? num(bs[0]?.longTermDebt);
-
-      const netCash = (typeof cash==='number' ? cash : 0) - (typeof debt==='number' ? debt : 0);
-
-      return { price, change, revenueTTM, opIncTTM, fcfTTM, cash, debt, netCash, sharesOut };
-    }
-
-    /* ===============================
-       VALUATION (HIV)
-       =============================== */
-    function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
-
-    function chooseR(sharesOut){
-      // crude size-based risk: smaller float -> higher r
-      if(!sharesOut) return R_DEFAULT;
-      if (sharesOut > 2e9) return 0.10;
-      if (sharesOut > 5e8) return 0.105;
-      if (sharesOut > 1e8) return 0.11;
-      return 0.12;
-    }
-
-    function computeHIV(f){
-      // Guard
-      if(!f || !f.price || !f.sharesOut || !f.revenueTTM){ return null; }
-
-      const r = chooseR(f.sharesOut);
-      // Operating margin (normalized)
-      const om = (f.opIncTTM && f.revenueTTM) ? clamp(f.opIncTTM / f.revenueTTM, -0.2, 0.4) : 0;
-      const omNorm = Math.max(0, Math.min(0.18, om)); // cap at 18% for conservatism
-
-      // 1) FCF leg
-      let wFCF = 0.6, wEPV = 0.3, wSales = 0.1;
-      let Vfcf = 0;
-      if (typeof f.fcfTTM === 'number' && f.fcfTTM > 0){
-        const g1 = 0.04; // conservative growth if we can't compute
-        const g = Math.min(G1_MAX, Math.max(0.0, g1));
-        Vfcf = f.fcfTTM * (1 + g) / Math.max(0.0001, (r - g));
-      } else {
-        wFCF = 0.0; wEPV = 0.4; wSales = 0.6;
-      }
-
-      // 2) Earnings Power Value (EPV) using normalized margin
-      const nopat = (f.revenueTTM * omNorm) * (1 - TAX_RATE);
-      const Vepv = nopat / Math.max(0.0001, r);
-
-      // 3) Sales-based leg (for transition names)
-      const targetMargin = Math.max(0.05, omNorm * 0.7); // a haircut; min 5%
-      const Vsales = (f.revenueTTM * targetMargin * (1 - TAX_RATE)) / Math.max(0.0001, (r - G0_TERM));
-
-      // 4) Net Cash
-      const netCashAdj = (typeof f.netCash==='number') ? f.netCash : 0;
-
-      const enterpriseVal = (wFCF * Vfcf) + (wEPV * Vepv) + (wSales * Vsales);
-      const equityVal = enterpriseVal + netCashAdj;
-
-      const fairPerShare = equityVal / f.sharesOut;
-      const gap = (fairPerShare - f.price) / f.price; // positive = undervalued
-
-      return {
-        fair: fairPerShare,
-        gap, // fraction
-        parts: { Vfcf, Vepv, Vsales, netCashAdj, wFCF, wEPV, wSales, r, omNorm }
-      };
-    }
-
-    /* ===============================
-       NEWS (Google News RSS)
-       =============================== */
-    function relTime(d){
-      const t = new Date(d).getTime(); if(!isFinite(t)) return '';
-      const mins = Math.max(1, Math.round((Date.now() - t)/60000));
-      if (mins < 60) return `${mins}m`; const hrs = Math.round(mins/60);
-      if (hrs < 24) return `${hrs}h`; return `${Math.round(hrs/24)}d`;
-    }
-    async function fetchNewsItems(query){
-      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-      const xmlText = await getRaw(url);
-      const doc = new DOMParser().parseFromString(xmlText, "text/xml");
-      const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
-        const title = node.getElementsByTagName('title')[0]?.textContent || '';
-        const link = node.getElementsByTagName('link')[0]?.textContent || '#';
-        const pub  = node.getElementsByTagName('pubDate')[0]?.textContent || '';
-        const source = node.getElementsByTagName('source')[0]?.textContent || '';
-        return { title, link, pub, source };
+    /**********************
+     * UI: TRADINGVIEW + TRENDS
+     **********************/
+    function renderTradingView(container, symbol){
+      const wrap=document.createElement('div');
+      wrap.className='tradingview-widget-container';
+      const widget=document.createElement('div');
+      widget.className='tradingview-widget-container__widget';
+      wrap.appendChild(widget);
+      const s=document.createElement('script');
+      s.type='text/javascript';
+      s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
+      s.async=true;
+      s.innerHTML=JSON.stringify({
+        symbols:[[symbol+"|1D"]],
+        chartOnly:false, width:"100%", height:"100%", autosize:true,
+        locale:"en", dateRange:"12M", showVolume:true, showMA:true, colorTheme:"dark"
       });
-      return items;
-    }
-    function renderNewsList(container, items){
-      if(!container) return;
-      if(!items?.length){
-        container.innerHTML = `<div class="news"><h3>Latest News</h3><div style="color:var(--muted)">—</div></div>`;
-        return;
-      }
-      container.innerHTML = `
-        <div class="news">
-          <h3>Latest News</h3>
-          <ul>
-            ${items.map(it => `
-              <li>
-                <a href="${it.link}" target="_blank" rel="noopener noreferrer">${it.title}</a>
-                ${it.source ? ` <span style="color:var(--muted);font-size:11px">(${it.source})</span>` : ''}
-                ${it.pub ? `<time>· ${relTime(it.pub)}</time>` : ''}
-              </li>
-            `).join('')}
-          </ul>
-        </div>`;
+      wrap.style.height='400px';
+      container.appendChild(wrap); container.appendChild(s);
     }
 
-    /* ===============================
-       GOOGLE TRENDS (1 month)
-       =============================== */
     function renderTrends(container, keyword){
       try{
         if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
@@ -315,213 +165,198 @@
         }
         const src = `https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
         const iframe=document.createElement('iframe');
-        iframe.src=src; iframe.width='100%'; iframe.height='260'; iframe.frameBorder='0';
+        iframe.src=src; iframe.width='100%'; iframe.height='360'; iframe.frameBorder='0';
         container.appendChild(iframe);
       }catch(e){
-        const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends embed error: '+e.message; container.appendChild(err);
+        const err=document.createElement('div'); err.style.color='#f99';
+        err.textContent='Trends error: '+e.message; container.appendChild(err);
       }
     }
 
-    /* ===============================
-       PRICE TILE (Yahoo price)
-       =============================== */
-    async function fetchYahooPriceOnly(ticker){
-      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ticker)}`;
-      const j = await getJSON(url);
-      const q = j?.quoteResponse?.result?.[0] || {};
-      return {
-        price: typeof q.regularMarketPrice==='number' ? q.regularMarketPrice : null,
-        changePct: typeof q.regularMarketChangePercent==='number' ? q.regularMarketChangePercent : null,
-        currency: q.currency || 'USD',
-        shortName: q.shortName || ticker
-      };
+    /**********************
+     * SPARKLINE (SVG)
+     **********************/
+    function renderSparkline(el, arr){
+      if(!el || !arr || arr.length<2){ el.innerHTML=''; return; }
+      const w = el.clientWidth || 260, h = 32, p=2;
+      const min = Math.min(...arr), max = Math.max(...arr), span = (max-min)||1;
+      const pts = arr.map((v,i)=>{
+        const x = p + (i*(w-2*p))/(arr.length-1);
+        const y = h - p - ((v-min)*(h-2*p))/span;
+        return [x,y];
+      });
+      const d = pts.map((p,i)=> (i? 'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+      el.innerHTML = `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <path d="${d}" fill="none" stroke="#8fb6ff" stroke-width="1.5"/>
+      </svg>`;
     }
 
-    /* ===============================
-       BUILD ROWS (AND SORT BY GAP)
-       =============================== */
+    /**********************
+     * RADAR CALCS (STOOQ DATA)
+     **********************/
+    function sma(arr,n){ const s=arr.slice(-n); return s.reduce((a,b)=>a+b,0)/Math.max(1,s.length); }
+
+    async function populateRadar(rowIdx, symbol){
+      try{
+        const sym = stooqSymbol(symbol);
+        const bench = stooqSymbol(BENCHMARK);
+        const [rows, brow] = await Promise.all([
+          fetchStooqDailyCSV(sym),
+          fetchStooqDailyCSV(bench)
+        ]);
+
+        const closes  = rows.map(r=>r.close);
+        const volumes = rows.map(r=>r.volume);
+        const price   = closes.at(-1);
+
+        // Sparkline: last 30 closes
+        renderSparkline(document.getElementById(`spark-${rowIdx}`), closes.slice(-30));
+
+        // Volume vs 20d avg
+        const recentVol = volumes.at(-1);
+        const avgVol = volumes.slice(-AVG_VOL_WIN).reduce((a,b)=>a+b,0)/Math.max(1, Math.min(AVG_VOL_WIN, volumes.length));
+        const volVs = recentVol / (avgVol || 1);
+        setVal(`vavg-${rowIdx}`, volVs.toFixed(2)+'x', volVs>=THRESH.volVsAvg);
+
+        // RS vs QQQ (10d)
+        const bc = brow.map(r=>r.close);
+        const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
+        const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
+        const rs = (price/p0) / (bc.at(-1)/b0) - 1;
+        setVal(`rs-${rowIdx}`, (rs*100).toFixed(1)+'%', rs>=THRESH.rsOutperf);
+
+        // Price vs 30d high
+        const windowCloses = closes.slice(-HIGH_LOOKBK);
+        const high = Math.max(...windowCloses);
+        const nearHigh = price/high - 1; // negative below high
+        setVal(`phigh-${rowIdx}`, (nearHigh*100).toFixed(1)+'%', nearHigh>=THRESH.nearHighPct);
+
+        // MAs
+        const ma50 = sma(closes, MA50_WIN);
+        const ma200 = sma(closes, MA200_WIN);
+        const above50 = price>ma50, above200 = price>ma200;
+        const maTxt = `${above50?'Above':'Below'} 50d / ${above200?'Above':'Below'} 200d`;
+        setVal(`ma-${rowIdx}`, maTxt, (above50 && above200));
+
+        // Next earnings (removed: Yahoo off); leave placeholder
+        setVal(`earn-${rowIdx}`, '—', null, true);
+
+      }catch(err){
+        // set dashes
+        ['vavg','rs','phigh','ma','earn'].forEach(k=>{
+          const a=document.getElementById(`${k}-${rowIdx}`); if(a) a.textContent='—';
+          const s=document.getElementById(`${k}-s-${rowIdx}`); if(s) s.innerHTML='<span class="sig neu"></span>';
+        });
+        console.error('Radar error', symbol, err);
+      }
+    }
+
+    function setVal(id, val, good=null, mute=false){
+      const vEl = document.getElementById(id); if(vEl){ vEl.textContent = val; if(mute) vEl.style.color='var(--muted)'; }
+      const sEl = document.getElementById(id+'-s'); if(sEl){
+        if(good===null){ sEl.innerHTML='<span class="sig neu"></span>'; }
+        else{ sEl.innerHTML = `<span class="sig ${good?'good':'bad'}"></span>`; }
+      }
+    }
+
+    /**********************
+     * BUILD + RENDER
+     **********************/
     const grid = document.getElementById('grid');
 
-    function buildRowShell(item){
-      const rid = rowIdFromSymbol(item.symbol);
-      const row = document.createElement('div'); row.className='row'; row.id = rid;
+    function buildRow(item, idx){
+      const row=document.createElement('div'); row.className='row';
 
-      // Left: Price
-      const left = document.createElement('div'); left.className='card';
-      left.innerHTML = `
-        <h2>${item.name} — Price</h2>
-        <div class="price-tile">
-          <div class="big" id="${cid(rid,'price')}">—</div>
-          <div class="chg" id="${cid(rid,'chg')}"></div>
-        </div>
-        <div style="height:240px;margin-top:8px;" id="${cid(rid,'tv')}"></div>
-      `;
+      // LEFT: price & chart (TradingView)
+      const left=document.createElement('div'); left.className='card';
+      const hL=document.createElement('h2'); hL.textContent=`${item.name} — Price`;
+      const cL=document.createElement('div'); cL.style.height='400px';
+      left.appendChild(hL); left.appendChild(cL);
 
-      // Middle: Trends
-      const mid = document.createElement('div'); mid.className='card';
-      mid.innerHTML = `
-        <h2>Google Trends — “${item.trendTerm}” (1m, Worldwide)</h2>
-        <div id="${cid(rid,'trends')}" style="height:260px;"></div>
-      `;
+      // MIDDLE: Google Trends
+      const mid=document.createElement('div'); mid.className='card';
+      const hM=document.createElement('h2'); hM.textContent=`Google Trends — “${item.trendTerm}” (3m, Worldwide)`;
+      const cM=document.createElement('div'); cM.style.height='360px';
+      mid.appendChild(hM); mid.appendChild(cM);
 
-      // Right: Valuation + News
-      const right = document.createElement('div'); right.className='card';
+      // RIGHT: Radar
+      const right=document.createElement('div'); right.className='card';
+      const hR=document.createElement('h2'); hR.textContent='Breakout Radar';
       const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
-      remove.addEventListener('click',()=> removeStockBySymbol(item.symbol));
-      right.appendChild(remove);
-      right.innerHTML += `
-        <h2>Intrinsic Valuation</h2>
-        <div class="val-table">
-          <div class="val-kv"><span>Fair Value / Share:</span><span id="${cid(rid,'fair')}">—</span></div>
-          <div class="val-kv"><span>Current Price:</span><span id="${cid(rid,'cur')}">—</span></div>
-          <div class="val-kv val-up"><span>Undervaluation:</span><span id="${cid(rid,'gap')}">—</span></div>
-        </div>
-        <div class="news" id="${cid(rid,'news')}"></div>
-      `;
+      remove.addEventListener('click',()=>removeStock(idx));
+      const tbl=document.createElement('table');
+      tbl.innerHTML = `
+        <thead>
+          <tr><th>Metric</th><th class="v">Value</th><th class="s">Signal</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Volume vs 20d Avg</td><td id="vavg-${idx}" class="v">—</td><td id="vavg-${idx}-s" class="s"><span class="sig neu"></span></td></tr>
+          <tr><td>RS vs ${BENCHMARK} (${RS_LOOKBACK}d)</td><td id="rs-${idx}" class="v">—</td><td id="rs-${idx}-s" class="s"><span class="sig neu"></span></td></tr>
+          <tr><td>Price vs 30d High</td><td id="phigh-${idx}" class="v">—</td><td id="phigh-${idx}-s" class="s"><span class="sig neu"></span></td></tr>
+          <tr><td>Above 50d / 200d MA</td><td id="ma-${idx}" class="v">—</td><td id="ma-${idx}-s" class="s"><span class="sig neu"></span></td></tr>
+          <tr><td>Next Earnings</td><td id="earn-${idx}" class="v">—</td><td class="s"><span class="sig neu"></span></td></tr>
+          <tr><td colspan="3"><div id="spark-${idx}" class="spark"></div></td></tr>
+        </tbody>`;
+      right.appendChild(hR); right.appendChild(remove); right.appendChild(tbl);
 
       row.appendChild(left); row.appendChild(mid); row.appendChild(right);
       grid.appendChild(row);
 
-      // Embeds
-      renderTrends(document.getElementById(cid(rid,'trends')), item.trendTerm);
-      // TradingView: small single-symbol widget
-      const tvMount = document.getElementById(cid(rid,'tv'));
-      const s=document.createElement('script');
-      s.type='text/javascript';
-      s.src='https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
-      s.async=true;
-      s.innerHTML=JSON.stringify({
-        symbol: item.symbol, width:"100%", height:"100%", locale:"en", dateRange:"3M", colorTheme:"dark",
-        trendLineColor:"#37a6ef", underLineColor:"rgba(55,166,239,0.15)", isTransparent:true
-      });
-      const wrap = document.createElement('div'); wrap.className='tradingview-widget-container__widget';
-      tvMount.appendChild(wrap); tvMount.appendChild(s);
+      // Embeds + fills
+      renderTradingView(cL, item.symbol);
+      renderTrends(cM, item.trendTerm);
+      populateRadar(idx, item.symbol);
     }
 
-    async function fillRowData(item){
-      const rid = rowIdFromSymbol(item.symbol);
-
-      // 1) Price
-      try{
-        const po = await fetchYahooPriceOnly(yTicker(item.symbol));
-        const pEl = document.getElementById(cid(rid,'price'));
-        const cEl = document.getElementById(cid(rid,'chg'));
-        if (pEl) pEl.textContent = po.price != null ? (po.price.toFixed(2)+' '+po.currency) : '—';
-        if (cEl) {
-          const sign = (po.changePct||0) >= 0 ? 'up' : 'down';
-          cEl.className = 'chg '+sign;
-          cEl.textContent = po.changePct != null ? ((po.changePct>0?'+':'')+po.changePct.toFixed(2)+'%') : '';
-        }
-      }catch(e){ console.error('price error', item.symbol, e); }
-
-      // 2) Fundamentals & Valuation
-      try{
-        const f = await getFundamentals(yTicker(item.symbol));
-        const v = computeHIV(f);
-        const fairEl = document.getElementById(cid(rid,'fair'));
-        const curEl  = document.getElementById(cid(rid,'cur'));
-        const gapEl  = document.getElementById(cid(rid,'gap'));
-        if (fairEl && v){
-          fairEl.textContent = '$'+v.fair.toFixed(2);
-          curEl.textContent  = f.price!=null ? ('$'+f.price.toFixed(2)) : '—';
-          const pct = v.gap*100;
-          gapEl.textContent  = (pct>=0?'+':'')+pct.toFixed(1)+'%';
-          gapEl.className = 'val-up ' + (pct>=0 ? 'up' : 'down');
-          // store gap on the row for later sorting
-          document.getElementById(rid).dataset.gap = v.gap;
-        } else {
-          if(fairEl){ fairEl.textContent='—'; }
-          if(curEl){ curEl.textContent='—'; }
-          if(gapEl){ gapEl.textContent='—'; gapEl.className='val-up'; }
-          document.getElementById(rid).dataset.gap = -999; // sinks to bottom
-        }
-      }catch(e){
-        console.error('valuation error', item.symbol, e);
-        const fairEl = document.getElementById(cid(rid,'fair'));
-        const curEl  = document.getElementById(cid(rid,'cur'));
-        const gapEl  = document.getElementById(cid(rid,'gap'));
-        if(fairEl) fairEl.textContent='—';
-        if(curEl)  curEl.textContent='—';
-        if(gapEl){ gapEl.textContent='—'; gapEl.className='val-up'; }
-        document.getElementById(rid).dataset.gap = -999;
-      }
-
-      // 3) News
-      try{
-        const q = `${yTicker(item.symbol)} stock OR ${item.name.replace(/\(.*?\)/g,'').trim()} stock`;
-        const items = await fetchNewsItems(q);
-        renderNewsList(document.getElementById(cid(rid,'news')), items);
-      }catch(e){
-        console.error('news error', item.symbol, e);
-        renderNewsList(document.getElementById(cid(rid,'news')), []);
-      }
-    }
-
-    function sortRowsByGap(){
-      // Sort by undervaluation (largest positive gap first)
-      const rows = Array.from(grid.children);
-      rows.sort((a,b)=>{
-        const ga = parseFloat(a.dataset.gap ?? '-999');
-        const gb = parseFloat(b.dataset.gap ?? '-999');
-        return (gb - ga); // desc
-      });
-      rows.forEach(r => grid.appendChild(r));
-    }
-
-    /* ===============================
-       RENDER / REFRESH
-       =============================== */
     function renderAll(){
-      grid.innerHTML = '';
+      grid.innerHTML='';
       const list = getWatchlist();
-      list.forEach(it => buildRowShell(it));
-      Promise.all(list.map(it => fillRowData(it)))
-        .then(()=> { sortRowsByGap(); updateTimestamp(); })
-        .catch(()=> { sortRowsByGap(); updateTimestamp(); });
+      list.forEach((it,i)=> buildRow(it,i));
+      updateTimestamp();
     }
 
-    function updateTimestamp(){
-      const el = document.getElementById('last-updated');
-      if(!el) return;
-      const ts = new Date().toLocaleTimeString();
-      el.textContent = `Last updated: ${ts}`;
-      el.style.color = 'var(--good)';
-      setTimeout(()=>{ el.style.color='var(--muted)'; }, 1500);
-    }
-
-    function addOrUpdateStock(){
+    /**********************
+     * WATCHLIST OPS
+     **********************/
+    function addOrUpdate(){
       const s = document.getElementById('in-symbol').value.trim();
       const n = document.getElementById('in-name').value.trim() || s;
       const t = document.getElementById('in-trend').value.trim() || n;
-      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:NU)'); return; }
-      const list = getWatchlist();
+      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
       const key = yTicker(s);
-      const i = list.findIndex(x => yTicker(x.symbol) === key);
-      if (i === -1) list.push({ symbol:s, name:n, trendTerm:t });
-      else          list[i] = { symbol:s, name:n, trendTerm:t };
+      const list = getWatchlist();
+      const i = list.findIndex(x=> yTicker(x.symbol)===key);
+      if(i===-1) list.push({symbol:s,name:n,trendTerm:t});
+      else       list[i]={symbol:s,name:n,trendTerm:t};
       setWatchlist(list);
       document.getElementById('in-symbol').value='';
       document.getElementById('in-name').value='';
       document.getElementById('in-trend').value='';
       renderAll();
     }
-
-    function removeStockBySymbol(symbol){
-      const key = yTicker(symbol);
-      const list = getWatchlist().filter(x => yTicker(x.symbol) !== key);
+    function removeStock(idx){
+      const list = getWatchlist();
+      list.splice(idx,1);
       setWatchlist(list);
       renderAll();
     }
-
     function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
 
-    document.getElementById('btn-add').addEventListener('click', addOrUpdateStock);
+    function updateTimestamp(){
+      const el=document.getElementById('last-updated');
+      if(!el) return;
+      el.textContent='Last updated: '+new Date().toLocaleTimeString();
+      el.style.color='var(--good)';
+      setTimeout(()=>{ el.style.color='var(--muted)'; },1200);
+    }
+
+    document.getElementById('btn-add').addEventListener('click', addOrUpdate);
     document.getElementById('btn-reset').addEventListener('click', resetDefaults);
     document.getElementById('btn-refresh').addEventListener('click', renderAll);
 
-    // initial render + periodic refresh
+    // Initial + periodic refresh
     renderAll();
-    setInterval(renderAll, REFRESH_MS_VAL);
+    setInterval(renderAll, AUTO_REFRESH_MS);
   </script>
 </body>
 </html>
