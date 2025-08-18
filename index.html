@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Breakthrough (Pre-Breakout) — Price • Google Trends • Radar + News</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Breakthrough Watch — Price • Google Trends (1m) • Pre-Breakout Radar + News</title>
 <style>
   :root{
     --bg:#0b0f14;--panel:#111826;--border:#1c2633;--text:#e6eef7;--muted:#9fb3c8;
@@ -11,701 +11,443 @@
   }
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-
   header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#0a1018;position:sticky;top:0;z-index:5}
   h1{margin:0;font-size:18px}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .toolbar input{background:#0e1522;border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text)}
-  .toolbar button, .toolbar select{background:#152235;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+  .toolbar button,.toolbar select{background:#152235;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
   .toolbar button:hover{filter:brightness(1.08)}
   #last-updated{color:var(--muted);font-size:12px}
 
   .container{display:flex;flex-direction:column;gap:16px;padding:16px}
   .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative;min-height:120px}
   .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600}
-
   .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
   .remove-btn:hover{filter:brightness(1.1)}
 
   .score{font-size:22px;font-weight:800;margin:2px 0 6px}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--border);margin-left:8px;color:var(--muted)}
   .score.good{color:var(--good)} .score.mid{color:var(--warn)} .score.bad{color:var(--bad)}
-
   .kv{display:flex;justify-content:space-between;gap:12px;margin:3px 0}
   .kv .lab{color:var(--muted)}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;margin:2px 4px 0 0;border:1px solid var(--border)}
   .ok{color:var(--good);border-color:rgba(25,195,125,.35)}
   .warn{color:var(--warn);border-color:rgba(234,179,8,.35)}
   .no{color:var(--bad);border-color:rgba(239,68,68,.35)}
-
   .spark{height:34px;width:100%;margin-top:6px}
   .sep{height:1px;background:var(--border);margin:8px 0}
-
   .news h3{margin:10px 0 6px;font-size:12px;color:var(--muted)}
   .news ul{list-style:none;margin:0;padding:0}
   .news li{margin:6px 0}
   .news a{color:var(--accent);text-decoration:none}
   .news a:hover{text-decoration:underline}
   .news time{color:var(--muted);font-size:11px;margin-left:6px}
-/* TradingView needs explicit heights */
-.tradingview-widget-container { height: 100%; }
-.tradingview-widget-container__widget { height: 100% !important; min-height: 320px; }
-
-/* Make sure the left card (chart) doesn’t visually overlap when TV injects iframes */
-.row .card:first-child { overflow: hidden; }
+  /* TradingView height hygiene */
+  .tradingview-widget-container{height:100%}
+  .tradingview-widget-container__widget{height:100% !important; min-height:320px}
+  .row .card:first-child{overflow:hidden}
   @media(max-width:980px){.row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-  <header>
-    <h1>Breakthrough Watch — Price • Google Trends (1m) • Pre-Breakout Radar + News</h1>
-    <div class="toolbar">
-      <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26" />
-      <input id="in-name" placeholder="Display name" size="18" />
-      <input id="in-trend" placeholder="Google Trends term" size="18" />
-      <button id="btn-add">Add / Update</button>
-      <button id="btn-reset">Reset defaults</button>
-      <button id="btn-refresh">Refresh Now</button>
-      <select id="sortby">
-        <option value="score">Sort: Score (desc)</option>
-        <option value="name">Sort: Name (A→Z)</option>
-      </select>
-      <span id="last-updated"></span>
-    </div>
-  </header>
+<header>
+  <h1>Breakthrough Watch — Price • Google Trends (1m) • Pre-Breakout Radar + News</h1>
+  <div class="toolbar">
+    <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26"/>
+    <input id="in-name" placeholder="Display name" size="18"/>
+    <input id="in-trend" placeholder="Google Trends term" size="18"/>
+    <button id="btn-add">Add / Update</button>
+    <button id="btn-reset">Reset defaults</button>
+    <button id="btn-refresh">Refresh Now</button>
+    <select id="sortby">
+      <option value="score">Sort: Score (desc)</option>
+      <option value="name">Sort: Name (A→Z)</option>
+    </select>
+    <span id="last-updated"></span>
+  </div>
+</header>
 
-  <div id="grid" class="container"></div>
+<div id="grid" class="container"></div>
 
-  <!-- Google Trends embed loader -->
-  <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
-  <script>
-
-    /**********************
- * PROXY FETCH (throttled + cached)
- **********************/
-const PROXIES = [
-  // Order matters; we rotate/retry with backoff on 429/5xx
-  (url) => `https://r.jina.ai/http://${url.replace(/^https?:\/\//,'')}`,
-  (url) => `https://r.jina.ai/https://${url.replace(/^https?:\/\//,'')}`,
-  (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://cors.isomorphic-git.org/${url}`,
+<!-- Google Trends embed loader -->
+<script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
+<script>
+/* =========================
+   SETTINGS
+   ========================= */
+const STORAGE_KEY='WATCHLIST_PREBREAKOUT_V2';
+const DEFAULT_WATCHLIST=[
+  { symbol:"NASDAQ:MVIS", name:"MicroVision (MVIS)", trendTerm:"MicroVision" },
+  { symbol:"NASDAQ:QSI",  name:"Quantum-Si (QSI)",   trendTerm:"Quantum-Si" },
+  { symbol:"NASDAQ:REKR", name:"Rekor Systems (REKR)", trendTerm:"Rekor Systems" }
 ];
+const TRENDS_GEO="";                  // worldwide
+const TRENDS_TIME="today 1-m";        // 1 month
+const BENCHMARK="QQQ";                // for RS
+const AUTO_REFRESH_MS=6*60*1000;      // refresh cadence (6m helps dodge 429s)
 
-const FETCH_CONCURRENCY = 2;       // don’t open too many at once (avoid 429)
-const FETCH_DELAY_MS    = 250;     // small gap between tasks
-const CACHE_TTL_MS      = 10*60*1000; // 10 min
+/* =========================
+   PROXY FETCH (queue + cache + backoff)
+   ========================= */
+const PROXIES=[
+  (url)=>`https://r.jina.ai/https://${url.replace(/^https?:\/\//,'')}`,
+  (url)=>`https://r.jina.ai/http://${url.replace(/^https?:\/\//,'')}`,
+  (url)=>`https://thingproxy.freeboard.io/fetch/${url}`,
+  (url)=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url)=>`https://cors.isomorphic-git.org/${url}`,
+  (url)=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+];
+const FETCH_CONCURRENCY=2;
+const FETCH_DELAY_MS=250;
+const CACHE_TTL_MS=10*60*1000;
 
-let activeTasks = 0;
-const taskQueue = [];
+let activeTasks=0; const taskQueue=[];
 function enqueueTask(fn){ return new Promise((resolve,reject)=>{ taskQueue.push({fn,resolve,reject}); pump(); }); }
 async function pump(){
-  if(activeTasks >= FETCH_CONCURRENCY || taskQueue.length===0) return;
-  const {fn,resolve,reject} = taskQueue.shift();
+  if(activeTasks>=FETCH_CONCURRENCY || !taskQueue.length) return;
+  const {fn,resolve,reject}=taskQueue.shift();
   activeTasks++;
-  try{ const res = await fn(); resolve(res); }
+  try{ const v=await fn(); resolve(v); }
   catch(e){ reject(e); }
-  finally{
-    activeTasks--;
-    setTimeout(pump, FETCH_DELAY_MS);
-  }
+  finally{ activeTasks--; setTimeout(pump, FETCH_DELAY_MS); }
 }
-
-// simple session cache
 function cacheGet(key){
-  try{
-    const raw = sessionStorage.getItem('cache:'+key);
-    if(!raw) return null;
-    const obj = JSON.parse(raw);
-    if(Date.now() - obj.t > CACHE_TTL_MS) return null;
-    return obj.v;
-  }catch{ return null; }
+  try{ const raw=sessionStorage.getItem('cache:'+key); if(!raw) return null;
+       const obj=JSON.parse(raw); if(Date.now()-obj.t>CACHE_TTL_MS) return null; return obj.v; }catch{return null}
 }
-function cacheSet(key, val){
-  try{ sessionStorage.setItem('cache:'+key, JSON.stringify({t:Date.now(), v:val})); }catch{}
-}
-
-// fetch via rotating proxies + backoff; returns TEXT
+function cacheSet(key,val){ try{ sessionStorage.setItem('cache:'+key, JSON.stringify({t:Date.now(),v:val})) }catch{} }
 async function proxyFetchText(url){
-  const cacheKey = url;
-  const cached = cacheGet(cacheKey);
-  if(cached) return cached;
-
-  const tryOnce = async (proxify, attempt) => {
-    const proxURL = proxify(url) + (proxify===PROXIES[3] || proxify===PROXIES[2] ? '' : (url.includes('?')?'&':'?')+'noCache='+Date.now());
-    const r = await fetch(proxURL, { method:'GET' });
-    if(!r.ok){
-      // backoff for 429/503
-      if(r.status===429 || r.status===503){
-        const wait = Math.min(2000 * attempt, 8000);
-        await new Promise(res=>setTimeout(res, wait));
-      }
-      throw new Error('status '+r.status);
-    }
-    const txt = await r.text();
-    if(!txt || txt.trim()==='') throw new Error('empty');
-    return txt;
-  };
-
+  const cacheKey=url;
+  const hit=cacheGet(cacheKey); if(hit) return hit;
   let lastErr;
-  // 2 rounds across proxies (in case some rate-limit)
   for(let round=1; round<=2; round++){
-    for(let i=0;i<PROXIES.length;i++){
+    for(const make of PROXIES){
       try{
-        const txt = await tryOnce(PROXIES[i], round);
-        cacheSet(cacheKey, txt);
-        return txt;
-      }catch(e){ lastErr = e; }
+        const prox=make(url);
+        const withBuster = prox + (prox.includes('allorigins')||prox.includes('freeboard')||prox.includes('codetabs') ? '' : (prox.includes('?')?'&':'?')+'noCache='+Date.now());
+        const r=await fetch(withBuster,{method:'GET'});
+        if(!r.ok){
+          if(r.status===429||r.status===503){ await new Promise(res=>setTimeout(res, Math.min(2000*round,8000))); }
+          throw new Error('status '+r.status);
+        }
+        const txt=await r.text();
+        if(!txt || !txt.trim()) throw new Error('empty');
+        cacheSet(cacheKey,txt); return txt;
+      }catch(e){ lastErr=e; }
     }
   }
-  throw lastErr || new Error('all proxies failed');
+  throw lastErr||new Error('all proxies failed');
 }
+function getRaw(url){ return enqueueTask(()=>proxyFetchText(url)); }
 
-// public wrapper you can call elsewhere
-function getRaw(url){
-  return enqueueTask(()=>proxyFetchText(url));
+/* =========================
+   WATCHLIST STORAGE
+   ========================= */
+function getWatchlist(){
+  try{ const raw=localStorage.getItem(STORAGE_KEY);
+       if(!raw) return DEFAULT_WATCHLIST.slice();
+       const arr=JSON.parse(raw); return Array.isArray(arr)&&arr.length?arr:DEFAULT_WATCHLIST.slice();
+  }catch{ return DEFAULT_WATCHLIST.slice(); }
 }
+function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
+function yTicker(sym){ return String(sym||'').split(':').pop().trim().toUpperCase(); }
+function stooqSymbol(sym){ return yTicker(sym).toLowerCase()+'.us'; }
+function rowIdFromSymbol(symbol){ return 'row-'+yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
+function cid(rid,key){ return `${key}-${rid}`; }
 
-    /**********************
-     * CONFIG
-     **********************/
-    const STORAGE_KEY = 'WATCHLIST_PREBREAKOUT_V1';
-    const DEFAULT_WATCHLIST = [
-      { symbol:"NASDAQ:MVIS", name:"MicroVision (MVIS)", trendTerm:"MicroVision" },
-      { symbol:"NASDAQ:QSI",  name:"Quantum-Si (QSI)",   trendTerm:"Quantum-Si" },
-      { symbol:"NASDAQ:REKR", name:"Rekor Systems (REKR)", trendTerm:"Rekor Systems" }
-    ];
+/* =========================
+   UTIL
+   ========================= */
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+function stdev(a){ const m=mean(a); return Math.sqrt(mean(a.map(x=>(x-m)*(x-m)))); }
+function sma(arr,n){ const s=arr.slice(-n); return s.reduce((a,b)=>a+b,0)/Math.max(1,s.length); }
+function percentileRank(arr,val){ if(!arr.length) return 0; let below=0; for(const v of arr){ if(v<=val) below++; } return below/arr.length; }
+function trueRange(h,l,pc){ return Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc)); }
+function relTime(d){ const t=new Date(d).getTime(); if(!isFinite(t)) return ''; const m=Math.max(1,Math.round((Date.now()-t)/60000)); if(m<60)return m+'m'; const h=Math.round(m/60); if(h<24)return h+'h'; return Math.round(h/24)+'d'; }
 
-    const TRENDS_GEO  = "";
-    const TRENDS_TIME = "today 1-m";
-    const BENCHMARK   = "QQQ";    // RS baseline
-    const AUTO_REFRESH_MS = 5 * 60 * 1000;
-
-    /**********************
-     * STORAGE
-     **********************/
-    function getWatchlist(){
-      try{
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw) return DEFAULT_WATCHLIST.slice();
-        const arr = JSON.parse(raw);
-        if(!Array.isArray(arr) || !arr.length) return DEFAULT_WATCHLIST.slice();
-        return arr;
-      }catch{ return DEFAULT_WATCHLIST.slice(); }
-    }
-    function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
-    function yTicker(sym){ return String(sym||'').split(':').pop().trim().toUpperCase(); }
-    function rowIdFromSymbol(symbol){ return 'row-' + yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
-    function cid(rid, key){ return `${key}-${rid}`; }
-
-    /**********************
-     * CORS-SAFE RAW FETCH
-     * (for Google News RSS; Stooq CSV already CORS-ok)
-     **********************/
-  async function getRaw(url) {
-  // r.jina.ai mirrors upstream with permissive CORS
-  const target = url.replace(/^https?:\/\//,'');
-  const candidates = [
-    `https://r.jina.ai/http://${target}`,
-    `https://r.jina.ai/https://${target}`
-  ];
-  const addBuster = u => u + (u.includes('?') ? '&' : '?') + 'noCache=' + Date.now();
-  let lastErr;
-  for (const prox of candidates) {
-    try {
-      const r = await fetch(addBuster(prox));
-      if (!r.ok) throw new Error('status ' + r.status);
-      return await r.text();
-    } catch(e){ lastErr = e; }
-  }
-  throw lastErr || new Error('proxy failed');
-}
-
-
-    /**********************
-     * STOOQ HELPERS (no key, CORS ok)
-     **********************/
-    function stooqSymbol(sym){
-      const t = String(sym || '').split(':').pop().trim().toLowerCase();
-      return `${t}.us`;
-    }
-   async function fetchStooqDailyCSV(sym){
-  const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
-  const text = await getRaw(url);
-  const lines = text.trim().split('\n');
-  if(lines.length<2) throw new Error('stooq empty');
-  const hdr = lines.shift().split(',');
-  const idx = Object.fromEntries(hdr.map((h,i)=>[h,i]));
+/* =========================
+   DATA FETCHERS (Stooq / News)
+   ========================= */
+async function fetchStooqDailyCSV(sym){
+  const url=`https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
+  const text=await getRaw(url);
+  const lines=text.trim().split('\n'); if(lines.length<2) throw new Error('stooq empty');
+  const hdr=lines.shift().split(','); const idx=Object.fromEntries(hdr.map((h,i)=>[h,i]));
   return lines.map(line=>{
-    const c = line.split(',');
-    return {
-      date:  c[idx['Date']],
-      open: +c[idx['Open']],
-      high: +c[idx['High']],
-      low:  +c[idx['Low']],
-      close:+c[idx['Close']],
-      volume:+c[idx['Volume']]
-    };
+    const c=line.split(',');
+    return { date:c[idx['Date']], open:+c[idx['Open']], high:+c[idx['High']], low:+c[idx['Low']], close:+c[idx['Close']], volume:+c[idx['Volume']] };
   }).filter(r=>Number.isFinite(r.close)&&Number.isFinite(r.volume));
 }
 
-    /**********************
-     * GOOGLE TRENDS + TV
-     **********************/
-    function renderTrends(container, keyword){
-      try{
-        if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
-          trends.embed.renderExploreWidgetTo(
-            container, 'TIMESERIES',
-            { comparisonItem:[{ keyword, geo:TRENDS_GEO, time:TRENDS_TIME }], category:0, property:'' },
-            { exploreQuery:`q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath:'https://trends.google.com:443/trends/embed/' }
-          ); return;
-        }
-        const src = `https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
-        const iframe=document.createElement('iframe');
-        iframe.src=src; iframe.width='100%'; iframe.height='360'; iframe.frameBorder='0';
-        container.appendChild(iframe);
-      }catch(e){
-        const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends error: '+e.message; container.appendChild(err);
-      }
-    }
-
-    function renderTradingView(container, symbol){
-  // 1) ensure the mount div has an explicit height
-  container.style.height = '400px';
-
-  // 2) create the required structure
-  const wrap = document.createElement('div');
-  wrap.className = 'tradingview-widget-container';
-
-  const widget = document.createElement('div');
-  widget.className = 'tradingview-widget-container__widget';
-  wrap.appendChild(widget);
-
-  container.innerHTML = '';           // clean any previous content
-  container.appendChild(wrap);        // mount the wrapper BEFORE loading script
-
-  // 3) inject the script AFTER the wrapper exists in the DOM
-  const s = document.createElement('script');
-  s.type = 'text/javascript';
-  s.async = true;
-  s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
-
-  s.innerHTML = JSON.stringify({
-    symbols: [[symbol + '|1D']],
-    autosize: true,
-    locale: 'en',
-    dateRange: '12M',
-    showVolume: true,
-    showMA: true,
-    colorTheme: 'dark'
-  });
-
-  // some browsers need a tick before injecting the script
-  setTimeout(() => container.appendChild(s), 0);
-}
-
-
-    /**********************
-     * SPARKLINE
-     **********************/
-    function renderSparkline(el, arr){
-      if(!el || !arr || arr.length<2){ el.innerHTML=''; return; }
-      const w = el.clientWidth || 260, h = 34, p=2;
-      const min = Math.min(...arr), max = Math.max(...arr), span = (max-min)||1;
-      const pts = arr.map((v,i)=>{
-        const x = p + (i*(w-2*p))/(arr.length-1);
-        const y = h - p - ((v-min)*(h-2*p))/span;
-        return [x,y];
-      });
-      const d = pts.map((p,i)=> (i? 'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-      el.innerHTML = `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        <path d="${d}" fill="none" stroke="#8fb6ff" stroke-width="1.5"/>
-      </svg>`;
-    }
-
-    /**********************
-     * MATH / INDICATORS
-     **********************/
-    const mean = a => a.reduce((x,y)=>x+y,0)/a.length;
-    function stdev(a){
-      const m = mean(a); const v = mean(a.map(x=> (x-m)*(x-m) ));
-      return Math.sqrt(v);
-    }
-    function sma(arr,n){ const s=arr.slice(-n); return s.reduce((a,b)=>a+b,0)/Math.max(1,s.length); }
-    function percentileRank(arr, value){
-      if(!arr.length) return 0;
-      let below = 0;
-      for(const v of arr){ if(v<=value) below++; }
-      return below/arr.length;
-    }
-    function linregSlope(y){
-      const n=y.length; if(n<2) return 0;
-      const x = Array.from({length:n}, (_,i)=>i+1);
-      const sx = x.reduce((a,b)=>a+b,0), sy=y.reduce((a,b)=>a+b,0);
-      const sxx = x.reduce((a,b)=>a+b*b,0);
-      const sxy = x.reduce((a,i)=>a+i*y[i-1],0);
-      const denom = n*sxx - sx*sx;
-      if(Math.abs(denom)<1e-9) return 0;
-      return (n*sxy - sx*sy)/denom;
-    }
-
-    function trueRange(h,l,pc){ return Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc)); }
-
-    /**********************
-     * PRE-BREAKOUT SCORE
-     **********************/
-    function computePreBreakout(rows, benchRows){
-      // rows / benchRows: array of {open,high,low,close,volume} oldest→newest
-      if(rows.length < 220 || benchRows.length < 60) return {score:0, parts:null}; // need history
-
-      const closes = rows.map(r=>r.close);
-      const highs  = rows.map(r=>r.high);
-      const lows   = rows.map(r=>r.low);
-      const vols   = rows.map(r=>r.volume);
-
-      // ATR% & percentile
-      const TR = rows.map((r,i)=> i? trueRange(r.high,r.low,rows[i-1].close) : (r.high-r.low));
-      const ATR20 = TR.map((_,i)=> i>=19 ? mean(TR.slice(i-19,i+1)) : NaN);
-      const atrPctSeries = ATR20.map((a,i)=> (i>=19 && closes[i]>0)? a/closes[i] : NaN).filter(x=>Number.isFinite(x));
-      const atrPct       = atrPctSeries.at(-1);
-      const atrPctPerc   = percentileRank(atrPctSeries.slice(-252), atrPct); // last year window
-
-      // BB width & percentile (20, 2std)
-      const BBwidthSeries = closes.map((_,i)=>{
-        if(i<19) return NaN;
-        const win = closes.slice(i-19,i+1);
-        const m = mean(win), sd=stdev(win);
-        return (sd>0 && m>0)? (4*sd/m) : NaN; // (upper-lower)/mid = 4*sd/m
-      }).filter(Number.isFinite);
-      const bbWidth = BBwidthSeries.at(-1);
-      const bbPerc  = percentileRank(BBwidthSeries.slice(-252), bbWidth);
-
-      // NR7/NR4 cluster (last 10 sessions)
-      const ranges = rows.map(r=>r.high-r.low);
-      function countNRn(n){
-        let c=0;
-        for(let i=rows.length-10;i<rows.length;i++){
-          if(i<0) continue;
-          const window = ranges.slice(i-n+1, i+1);
-          if(window.length===n && ranges[i]===Math.min(...window)) c++;
-        }
-        return c;
-      }
-      const nr7 = countNRn(7), nr4 = countNRn(4);
-      const hasNRcluster = (nr7>=2) || (nr4>=2);
-
-      // Up/Down vol ratio (10) with flat price ±3%
-      let upVol=0, downVol=0;
-      for(let i=rows.length-10;i<rows.length;i++){
-        if(i<=0) continue;
-        const up = closes[i] > closes[i-1];
-        if(up) upVol += vols[i]; else downVol += vols[i];
-      }
-      const udRatio = (downVol>0)? upVol/downVol : 0;
-      const d10 = closes.at(-1)/closes.at(-11) - 1;
-      const flat10 = Math.abs(d10) <= 0.03;
-
-      // OBV slope (20)
-      let obv=[0];
-      for(let i=1;i<rows.length;i++){
-        const sign = closes[i]>closes[i-1]? 1 : (closes[i]<closes[i-1]? -1 : 0);
-        obv.push(obv[i-1] + sign*vols[i]);
-      }
-      const obvSlope20 = linregSlope(obv.slice(-20));
-
-      // Pocket Pivot in last 3: up-volume > max down-volume(10) AND close>10DMA
-      const sma10 = sma(closes,10);
-      let ppivot=false;
-      for(let k=rows.length-3;k<rows.length;k++){
-        if(k<=0) continue;
-        const up = closes[k] > closes[k-1];
-        const winStart = Math.max(0,k-10);
-        const downVols = [];
-        for(let j=winStart;j<k;j++){
-          if(closes[j] < closes[j-1]) downVols.push(vols[j]);
-        }
-        const maxDown = downVols.length? Math.max(...downVols) : 0;
-        if(up && vols[k] > maxDown && closes[k] > sma(closes.slice(0,k+1),10)) { ppivot=true; break; }
-      }
-
-      // RS vs QQQ
-      const bc = benchRows.map(r=>r.close);
-      const minLen = Math.min(closes.length, bc.length);
-      const ratio = closes.slice(-minLen).map((c,i)=> c / bc.slice(-minLen)[i]);
-      const rsSlope10 = linregSlope(ratio.slice(-10));
-      const rsPerc    = percentileRank(ratio.slice(-60), ratio.at(-1)); // ~3 months
-
-      // Location
-      const last = closes.at(-1);
-      const high30 = Math.max(...closes.slice(-30));
-      const distHigh = last/high30 - 1; // negative under high
-      const sma50now = sma(closes,50);
-      const sma50old = sma(closes.slice(0,-10),50);
-      const ma50Rising = (sma50now && sma50old) ? (sma50now > sma50old) : false;
-      const nearMA50 = (last > sma50now) && ((last/sma50now -1) <= 0.05);
-
-      // Sub-signals → booleans
-      const SQUEEZE = {
-        atrLow: atrPctPerc <= 0.20,
-        bbLow:  bbPerc  <= 0.20,
-        nrx:    hasNRcluster
-      };
-      const ACCUM = {
-        udOK:   udRatio >= 1.2 && flat10,
-        obvUp:  obvSlope20 > 0,
-        pivot:  ppivot
-      };
-      const LEAD = {
-        rsUp:   rsSlope10 > 0,
-        rsTop:  rsPerc >= 0.75
-      };
-      const LOC = {
-        nearHigh: (distHigh <= -0.02 && distHigh >= -0.08),
-        ma50OK:   (ma50Rising && nearMA50)
-      };
-
-      // Scoring
-      function pts(b, ok, mid=0, bad=0){ return ok ? b : bad; }
-      const squeezePts = pts(10,SQUEEZE.atrLow)+pts(10,SQUEEZE.bbLow)+pts(10,SQUEEZE.nrx);
-      const accumPts   = pts(10,ACCUM.udOK)+pts(10,ACCUM.obvUp)+pts(15,ACCUM.pivot);
-      const leadPts    = pts(10,LEAD.rsUp)+pts(15,LEAD.rsTop);
-      const locPts     = pts(6,LOC.nearHigh)+pts(4,LOC.ma50OK);
-      const score = squeezePts + accumPts + leadPts + locPts;
-
-      return {
-        score,
-        detail:{
-          SQUEEZE, ACCUM, LEAD, LOC,
-          atrPct:(atrPct*100), atrPctPerc, bbWidth, bbPerc, udRatio, d10,
-          rsPerc, rsSlope10, distHigh, sma50now
-        }
-      };
-    }
-
-    /**********************
-     * NEWS (Google News RSS via r.jina.ai)
-     **********************/
-   function relTime(d){
-  const t = new Date(d).getTime(); if(!isFinite(t)) return '';
-  const mins = Math.max(1, Math.round((Date.now() - t)/60000));
-  if (mins < 60) return `${mins}m`; const hrs = Math.round(mins/60);
-  if (hrs < 24) return `${hrs}h`; return `${Math.round(hrs/24)}d`;
-}
-
 async function fetchNewsItems(query){
-  const url = `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=RSS`;
-  const xmlText = await getRaw(url);
-  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
-  const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
-    const title = node.getElementsByTagName('title')[0]?.textContent || '';
-    const link  = node.getElementsByTagName('link')[0]?.textContent || '#';
-    const pub   = node.getElementsByTagName('pubDate')[0]?.textContent || '';
-    const source= node.getElementsByTagName('source')[0]?.textContent || '';
-    return { title, link, pub, source };
+  const url=`https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=RSS`;
+  const xml=await getRaw(url);
+  const doc=new DOMParser().parseFromString(xml,"text/xml");
+  return [...doc.getElementsByTagName('item')].slice(0,3).map(n=>{
+    const title=n.getElementsByTagName('title')[0]?.textContent||'';
+    const link =n.getElementsByTagName('link')[0]?.textContent||'#';
+    const pub  =n.getElementsByTagName('pubDate')[0]?.textContent||'';
+    const source=n.getElementsByTagName('source')[0]?.textContent||'';
+    return {title,link,pub,source};
   });
-  return items;
 }
 
-    /**********************
-     * BUILD / RENDER
-     **********************/
-    const grid = document.getElementById('grid');
-
-    function buildRow(item){
-      const rid = rowIdFromSymbol(item.symbol);
-      const row=document.createElement('div'); row.className='row'; row.id = rid;
-
-      // LEFT — Price & Chart
-      const left=document.createElement('div'); left.className='card';
-      left.innerHTML = `<h2>${item.name} — Price & Chart</h2><div id="${cid(rid,'tv')}" style="height:400px"></div>`;
-      row.appendChild(left);
-
-
-
-      // MIDDLE — Trends
-      const mid=document.createElement('div'); mid.className='card';
-      mid.innerHTML = `<h2>Google Trends — “${item.trendTerm}” (1m, Worldwide)</h2><div id="${cid(rid,'trends')}" style="height:360px"></div>`;
-      row.appendChild(mid);
-
-      // RIGHT — Radar + News
-      const right=document.createElement('div'); right.className='card';
-      const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
-      remove.addEventListener('click',()=>removeStock(item.symbol));
-      right.appendChild(remove);
-      right.innerHTML += `
-        <h2>Pre-Breakout Radar</h2>
-        <div class="kv"><span class="lab">Score</span><span class="score" id="${cid(rid,'score')}">—</span></div>
-        <div class="kv"><span class="lab">Squeeze</span><span id="${cid(rid,'sq-tags')}"></span></div>
-        <div class="kv"><span class="lab">Accumulation</span><span id="${cid(rid,'ac-tags')}"></span></div>
-        <div class="kv"><span class="lab">Leadership</span><span id="${cid(rid,'ld-tags')}"></span></div>
-        <div class="kv"><span class="lab">Location</span><span id="${cid(rid,'lo-tags')}"></span></div>
-        <div id="${cid(rid,'spark')}" class="spark"></div>
-        <div class="sep"></div>
-        <div class="news" id="${cid(rid,'news')}"></div>
-      `;
-      row.appendChild(right);
-
-      grid.appendChild(row);
-
-      // Embeds
-      renderTradingView(document.getElementById(cid(rid,'tv')), item.symbol);
-      renderTrends(document.getElementById(cid(rid,'trends')), item.trendTerm);
-
-      // Fill computed data
-      fillRowData(item);
+/* =========================
+   TRENDS + TRADINGVIEW
+   ========================= */
+function renderTrends(container, keyword){
+  try{
+    if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
+      trends.embed.renderExploreWidgetTo(
+        container,'TIMESERIES',
+        {comparisonItem:[{keyword,geo:TRENDS_GEO,time:TRENDS_TIME}],category:0,property:''},
+        {exploreQuery:`q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`,guestPath:'https://trends.google.com:443/trends/embed/'}
+      ); return;
     }
+    const src=`https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
+    const iframe=document.createElement('iframe'); iframe.src=src; iframe.width='100%'; iframe.height='360'; iframe.frameBorder='0'; container.appendChild(iframe);
+  }catch(e){ const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends error: '+e.message; container.appendChild(err); }
+}
 
-    async function fillRowData(item){
-      const rid = rowIdFromSymbol(item.symbol);
-      try{
-        const sym = stooqSymbol(item.symbol);
-        const bench = stooqSymbol(BENCHMARK);
-        const [rows, brow] = await Promise.all([
-          fetchStooqDailyCSV(sym),
-          fetchStooqDailyCSV(bench)
-        ]);
-        // Sparkline (last 30 closes)
-        renderSparkline(document.getElementById(cid(rid,'spark')), rows.slice(-30).map(r=>r.close));
+function renderTradingView(container, symbol){
+  container.style.height='400px';
+  const wrap=document.createElement('div'); wrap.className='tradingview-widget-container';
+  const widget=document.createElement('div'); widget.className='tradingview-widget-container__widget'; wrap.appendChild(widget);
+  container.innerHTML=''; container.appendChild(wrap);
+  const s=document.createElement('script'); s.type='text/javascript'; s.async=true;
+  s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
+  s.innerHTML=JSON.stringify({ symbols:[[symbol+'|1D']], autosize:true, locale:'en', dateRange:'12M', showVolume:true, showMA:true, colorTheme:'dark' });
+  setTimeout(()=>container.appendChild(s),0);
+}
 
-        // Pre-Breakout score
-        const pb = computePreBreakout(rows, brow);
-        const sEl = document.getElementById(cid(rid,'score'));
-        if(sEl){
-          let cls='bad', badge='C';
-          if(pb.score>=70){cls='good';badge='A';}
-          else if(pb.score>=55){cls='mid';badge='B';}
-          sEl.className = 'score '+cls;
-          sEl.textContent = pb.score.toFixed(0);
-          sEl.insertAdjacentHTML('beforeend', ` <span class="badge">${badge}</span>`);
-        }
-        // Tags
-        function tag(ok, label){ return `<span class="pill ${ok?'ok':'no'}">${label}</span>`; }
-        function tagMid(ok, label){ return `<span class="pill ${ok?'ok':'warn'}">${label}</span>`; }
-        const d = pb.detail;
+/* =========================
+   SPARKLINE
+   ========================= */
+function renderSparkline(el, arr){
+  if(!el || !arr || arr.length<2){ el.innerHTML=''; return; }
+  const w=el.clientWidth||260, h=34, p=2;
+  const min=Math.min(...arr), max=Math.max(...arr), span=(max-min)||1;
+  const pts=arr.map((v,i)=>{ const x=p+(i*(w-2*p))/(arr.length-1); const y=h-p-((v-min)*(h-2*p))/span; return [x,y]; });
+  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  el.innerHTML=`<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="#8fb6ff" stroke-width="1.5"/></svg>`;
+}
 
-        const sq = document.getElementById(cid(rid,'sq-tags'));
-        if(sq) sq.innerHTML = [
-          tag(d?.SQUEEZE?.atrLow,'ATR% low'),
-          tag(d?.SQUEEZE?.bbLow,'BB width low'),
-          tag(d?.SQUEEZE?.nrx,'NR7/NR4 cluster')
-        ].join(' ');
+/* =========================
+   PRE-BREAKOUT SCORE
+   ========================= */
+function computePreBreakout(rows, benchRows){
+  if(rows.length<220 || benchRows.length<60) return {score:0,detail:null};
+  const closes=rows.map(r=>r.close), highs=rows.map(r=>r.high), lows=rows.map(r=>r.low), vols=rows.map(r=>r.volume);
 
-        const ac = document.getElementById(cid(rid,'ac-tags'));
-        if(ac) ac.innerHTML = [
-          tagMid(d?.ACCUM?.udOK,'Up/Down≥1.2 (flat)'),
-          tag(d?.ACCUM?.obvUp,'OBV↑'),
-          tag(d?.ACCUM?.pivot,'Pocket Pivot')
-        ].join(' ');
+  // ATR% percentile (20)
+  const TR=rows.map((r,i)=> i? trueRange(r.high,r.low,rows[i-1].close) : (r.high-r.low));
+  const ATR20=TR.map((_,i)=> i>=19? mean(TR.slice(i-19,i+1)) : NaN);
+  const atrPctSeries=ATR20.map((a,i)=> (i>=19&&closes[i]>0)? a/closes[i] : NaN).filter(Number.isFinite);
+  const atrPct=atrPctSeries.at(-1); const atrPctPerc=percentileRank(atrPctSeries.slice(-252), atrPct);
 
-        const ld = document.getElementById(cid(rid,'ld-tags'));
-        if(ld) ld.innerHTML = [
-          tag(d?.LEAD?.rsUp,'RS slope↑'),
-          tag(d?.LEAD?.rsTop,'RS in top 25%')
-        ].join(' ');
+  // BB width percentile (20,2)
+  const BBwidthSeries=closes.map((_,i)=>{
+    if(i<19) return NaN; const win=closes.slice(i-19,i+1); const m=mean(win), sd=stdev(win);
+    return (sd>0&&m>0)? (4*sd/m):NaN;
+  }).filter(Number.isFinite);
+  const bbWidth=BBwidthSeries.at(-1); const bbPerc=percentileRank(BBwidthSeries.slice(-252), bbWidth);
 
-        const lo = document.getElementById(cid(rid,'lo-tags'));
-        if(lo) lo.innerHTML = [
-          tag(d?.LOC?.nearHigh,'2–8% under 30-high'),
-          tag(d?.LOC?.ma50OK,'50-DMA rising & close above')
-        ].join(' ');
+  // NR7/NR4 cluster
+  const ranges=rows.map(r=>r.high-r.low);
+  function countNRn(n){ let c=0; for(let i=rows.length-10;i<rows.length;i++){ if(i<0) continue; const win=ranges.slice(i-n+1,i+1); if(win.length===n && ranges[i]===Math.min(...win)) c++; } return c; }
+  const nr7=countNRn(7), nr4=countNRn(4); const hasNRcluster=(nr7>=2)||(nr4>=2);
 
-        // Sorting data attribute
-        const row = document.getElementById(rid);
-        if(row){ row.dataset.score = pb.score.toFixed(2); }
+  // Up/Down vol ratio (10) with flat price ±3%
+  let upVol=0,downVol=0; for(let i=rows.length-10;i<rows.length;i++){ if(i<=0) continue; const up=closes[i]>closes[i-1]; if(up) upVol+=vols[i]; else downVol+=vols[i]; }
+  const udRatio=(downVol>0)? upVol/downVol:0; const d10=closes.at(-1)/closes.at(-11)-1; const flat10=Math.abs(d10)<=0.03;
 
-      }catch(e){
-        console.error('calc error', item.symbol, e);
-        const row = document.getElementById(rid);
-        if(row){ row.dataset.score = '0'; }
-      }
+  // OBV slope (20)
+  let obv=[0]; for(let i=1;i<rows.length;i++){ const sign=closes[i]>closes[i-1]?1:(closes[i]<closes[i-1]?-1:0); obv.push(obv[i-1]+sign*vols[i]); }
+  const obvSlope20=(function(){ const s=obv.slice(-20); if(s.length<2) return 0; const n=s.length; const x=Array.from({length:n},(_,i)=>i+1); const sx=x.reduce((a,b)=>a+b,0), sy=s.reduce((a,b)=>a+b,0); const sxx=x.reduce((a,b)=>a+b*b,0); const sxy=x.reduce((a,i)=>a+i*s[i-1],0); const denom=n*sxx-sx*sx; return Math.abs(denom)<1e-9?0:(n*sxy-sx*sy)/denom; })();
 
-      // News
-      try{
-        const q = `${yTicker(item.symbol)} stock OR ${item.name.replace(/\(.*?\)/g,'').trim()} stock`;
-        const items = await fetchNewsItems(q);
-        const nEl = document.getElementById(cid(rid,'news'));
-        if(nEl){
-          if(!items?.length){ nEl.innerHTML = `<h3>Latest News</h3><div style="color:var(--muted)">—</div>`; }
-          else{
-            nEl.innerHTML = `<h3>Latest News</h3><ul>${
-              items.map(it=>`<li><a target="_blank" rel="noopener noreferrer" href="${it.link}">${it.title}</a> ${
-                it.source?`<span style="color:var(--muted);font-size:11px">(${it.source})</span>`:''}${
-                it.pub?` <time>· ${relTime(it.pub)}</time>`:''}</li>`).join('')
-            }</ul>`;
-          }
-        }
-      }catch(e){
-        console.error('news error', item.symbol, e);
-      }
+  // Pocket Pivot in last 3
+  let ppivot=false; for(let k=rows.length-3;k<rows.length;k++){ if(k<=0) continue; const up=closes[k]>closes[k-1]; const winStart=Math.max(0,k-10); const downVols=[]; for(let j=winStart;j<k;j++){ if(closes[j]<closes[j-1]) downVols.push(vols[j]); } const maxDown=downVols.length?Math.max(...downVols):0; if(up && vols[k]>maxDown && closes[k]>sma(closes.slice(0,k+1),10)){ ppivot=true; break; } }
 
-      sortRowsLive();
-      updateTimestamp();
+  // RS vs benchmark
+  const bc=benchRows.map(r=>r.close); const minLen=Math.min(closes.length, bc.length);
+  const ratio=closes.slice(-minLen).map((c,i)=> c / bc.slice(-minLen)[i]);
+  const rsSlope10=(function(){ const s=ratio.slice(-10); if(s.length<2) return 0; const n=s.length; const x=Array.from({length:n},(_,i)=>i+1); const sx=x.reduce((a,b)=>a+b,0), sy=s.reduce((a,b)=>a+b,0); const sxx=x.reduce((a,b)=>a+b*b,0); const sxy=x.reduce((a,i)=>a+i*s[i-1],0); const denom=n*sxx-sx*sx; return Math.abs(denom)<1e-9?0:(n*sxy-sx*sy)/denom; })();
+  const rsPerc=percentileRank(ratio.slice(-60), ratio.at(-1));
+
+  // Location
+  const last=closes.at(-1); const high30=Math.max(...closes.slice(-30)); const distHigh=last/high30-1;
+  const sma50now=sma(closes,50); const sma50old=sma(closes.slice(0,-10),50); const ma50Rising=(sma50now && sma50old)?(sma50now>sma50old):false; const nearMA50=(last>sma50now)&&((last/sma50now-1)<=0.05);
+
+  const SQUEEZE={ atrLow: atrPctPerc<=0.20, bbLow: bbPerc<=0.20, nrx: hasNRcluster };
+  const ACCUM  ={ udOK: udRatio>=1.2 && flat10, obvUp: obvSlope20>0, pivot: ppivot };
+  const LEAD   ={ rsUp: rsSlope10>0, rsTop: rsPerc>=0.75 };
+  const LOC    ={ nearHigh: (distHigh<=-0.02 && distHigh>=-0.08), ma50OK: (ma50Rising && nearMA50) };
+
+  const pts=(b,ok)=> ok?b:0;
+  const score = pts(10,SQUEEZE.atrLow)+pts(10,SQUEEZE.bbLow)+pts(10,SQUEEZE.nrx)
+              + pts(10,ACCUM.udOK)+pts(10,ACCUM.obvUp)+pts(15,ACCUM.pivot)
+              + pts(10,LEAD.rsUp)+pts(15,LEAD.rsTop)
+              + pts(6,LOC.nearHigh)+pts(4,LOC.ma50OK);
+
+  return {score, detail:{SQUEEZE,ACCUM,LEAD,LOC}};
+}
+
+/* =========================
+   BUILD / RENDER
+   ========================= */
+const grid=document.getElementById('grid');
+let lastBench=null;
+
+async function getBenchmarkRows(){
+  if(lastBench && (Date.now()-lastBench.t<CACHE_TTL_MS)) return lastBench.rows;
+  const rows=await fetchStooqDailyCSV(stooqSymbol(BENCHMARK));
+  lastBench={rows,t:Date.now()}; return rows;
+}
+
+function buildRow(item){
+  const rid=rowIdFromSymbol(item.symbol);
+  const row=document.createElement('div'); row.className='row'; row.id=rid;
+
+  // LEFT
+  const left=document.createElement('div'); left.className='card';
+  left.innerHTML=`<h2>${item.name} — Price & Chart</h2><div id="${cid(rid,'tv')}" style="height:400px"></div>`;
+  row.appendChild(left);
+
+  // MIDDLE
+  const mid=document.createElement('div'); mid.className='card';
+  mid.innerHTML=`<h2>Google Trends — “${item.trendTerm}” (1m, Worldwide)</h2><div id="${cid(rid,'trends')}" style="height:360px"></div>`;
+  row.appendChild(mid);
+
+  // RIGHT
+  const right=document.createElement('div'); right.className='card';
+  const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
+  remove.addEventListener('click',()=>removeStock(item.symbol));
+  right.appendChild(remove);
+  right.innerHTML+=`
+    <h2>Pre-Breakout Radar</h2>
+    <div class="kv"><span class="lab">Score</span><span class="score" id="${cid(rid,'score')}">—</span></div>
+    <div class="kv"><span class="lab">Squeeze</span><span id="${cid(rid,'sq-tags')}"></span></div>
+    <div class="kv"><span class="lab">Accumulation</span><span id="${cid(rid,'ac-tags')}"></span></div>
+    <div class="kv"><span class="lab">Leadership</span><span id="${cid(rid,'ld-tags')}"></span></div>
+    <div class="kv"><span class="lab">Location</span><span id="${cid(rid,'lo-tags')}"></span></div>
+    <div id="${cid(rid,'spark')}" class="spark"></div>
+    <div class="sep"></div>
+    <div class="news" id="${cid(rid,'news')}"></div>
+  `;
+  row.appendChild(right);
+
+  grid.appendChild(row);
+
+  renderTradingView(document.getElementById(cid(rid,'tv')), item.symbol);
+  renderTrends(document.getElementById(cid(rid,'trends')), item.trendTerm);
+  fillRowData(item);
+}
+
+function tag(ok,label,mid=false){ return `<span class="pill ${ok?'ok':(mid?'warn':'no')}">${label}</span>`; }
+
+async function fillRowData(item){
+  const rid=rowIdFromSymbol(item.symbol);
+  try{
+    const sym=stooqSymbol(item.symbol);
+    const [rows, brow]=await Promise.all([ fetchStooqDailyCSV(sym), getBenchmarkRows() ]);
+    renderSparkline(document.getElementById(cid(rid,'spark')), rows.slice(-30).map(r=>r.close));
+
+    const pb=computePreBreakout(rows,brow);
+    const sEl=document.getElementById(cid(rid,'score'));
+    if(sEl){
+      let cls='bad', badge='C';
+      if(pb.score>=70){ cls='good'; badge='A'; }
+      else if(pb.score>=55){ cls='mid'; badge='B'; }
+      sEl.className='score '+cls; sEl.textContent=pb.score.toFixed(0);
+      sEl.insertAdjacentHTML('beforeend',` <span class="badge">${badge}</span>`);
     }
+    const d=pb.detail||{};
+    const sq=document.getElementById(cid(rid,'sq-tags'));
+    if(sq) sq.innerHTML=[ tag(d?.SQUEEZE?.atrLow,'ATR% low'), tag(d?.SQUEEZE?.bbLow,'BB width low'), tag(d?.SQUEEZE?.nrx,'NR7/NR4 cluster') ].join(' ');
+    const ac=document.getElementById(cid(rid,'ac-tags'));
+    if(ac) ac.innerHTML=[ tag(d?.ACCUM?.udOK,'Up/Down≥1.2 (flat)',true), tag(d?.ACCUM?.obvUp,'OBV↑'), tag(d?.ACCUM?.pivot,'Pocket Pivot') ].join(' ');
+    const ld=document.getElementById(cid(rid,'ld-tags'));
+    if(ld) ld.innerHTML=[ tag(d?.LEAD?.rsUp,'RS slope↑'), tag(d?.LEAD?.rsTop,'RS top 25%') ].join(' ');
+    const lo=document.getElementById(cid(rid,'lo-tags'));
+    if(lo) lo.innerHTML=[ tag(d?.LOC?.nearHigh,'2–8% under 30-high'), tag(d?.LOC?.ma50OK,'50-DMA rising & above') ].join(' ');
 
-    function sortRowsLive(){
-      const sel = document.getElementById('sortby').value;
-      const rows = Array.from(grid.children);
-      if(sel==='name'){
-        rows.sort((a,b)=> (a.id>a.id?1:-1));
-      }else{
-        rows.sort((a,b)=> (parseFloat(b.dataset.score||'0') - parseFloat(a.dataset.score||'0')));
-      }
-      rows.forEach(r => grid.appendChild(r));
-    }
+    const row=document.getElementById(rid); if(row) row.dataset.score = String(pb.score||0);
+  }catch(e){
+    console.error('calc error', item.symbol, e);
+    const row=document.getElementById(rid); if(row) row.dataset.score='0';
+    // placeholders
+    ['sq-tags','ac-tags','ld-tags','lo-tags','spark','score','news'].forEach(k=>{
+      const el=document.getElementById(`${k}-${rid}`); if(!el) return;
+      if(k==='score'){ el.textContent='—'; el.className='score'; }
+      else if(k==='news'){ el.innerHTML = `<h3>Latest News</h3><div style="color:var(--muted)">—</div>`; }
+      else el.innerHTML='';
+    });
+  }
 
-    /**********************
-     * WATCHLIST OPS
-     **********************/
-    function renderAll(){
-      grid.innerHTML='';
-      const list = getWatchlist();
-      list.forEach(it => buildRow(it));
-      sortRowsLive();
-      updateTimestamp();
+  // News (don’t block radar if it fails)
+  try{
+    const q=`${yTicker(item.symbol)} stock OR ${item.name.replace(/\(.*?\)/g,'').trim()} stock`;
+    const items=await fetchNewsItems(q);
+    const nEl=document.getElementById(cid(rid,'news'));
+    if(nEl){
+      if(!items?.length) nEl.innerHTML=`<h3>Latest News</h3><div style="color:var(--muted)">—</div>`;
+      else nEl.innerHTML=`<h3>Latest News</h3><ul>${
+        items.map(it=>`<li><a target="_blank" rel="noopener noreferrer" href="${it.link}">${it.title}</a>${
+          it.source?` <span style="color:var(--muted);font-size:11px">(${it.source})</span>`:''}${
+          it.pub?` <time>· ${relTime(it.pub)}</time>`:''}</li>`).join('')
+      }</ul>`;
     }
-    function addOrUpdate(){
-      const s = document.getElementById('in-symbol').value.trim();
-      const n = document.getElementById('in-name').value.trim() || s;
-      const t = document.getElementById('in-trend').value.trim() || n;
-      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
-      const key = yTicker(s);
-      const list = getWatchlist();
-      const i = list.findIndex(x=> yTicker(x.symbol)===key);
-      if(i===-1) list.push({symbol:s,name:n,trendTerm:t});
-      else       list[i] = {symbol:s,name:n,trendTerm:t};
-      setWatchlist(list);
-      document.getElementById('in-symbol').value='';
-      document.getElementById('in-name').value='';
-      document.getElementById('in-trend').value='';
-      renderAll();
-    }
-    function removeStock(symbol){
-      const key = yTicker(symbol);
-      const list = getWatchlist().filter(x=> yTicker(x.symbol)!==key);
-      setWatchlist(list);
-      renderAll();
-    }
-    function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
-    function updateTimestamp(){
-      const el=document.getElementById('last-updated');
-      if(!el) return;
-      el.textContent='Last updated: '+new Date().toLocaleTimeString();
-      el.style.color='var(--good)';
-      setTimeout(()=>{ el.style.color='var(--muted)'; },1200);
-    }
+  }catch(e){ console.error('news error', item.symbol, e); }
 
-    document.getElementById('btn-add').addEventListener('click', addOrUpdate);
-    document.getElementById('btn-reset').addEventListener('click', resetDefaults);
-    document.getElementById('btn-refresh').addEventListener('click', renderAll);
-    document.getElementById('sortby').addEventListener('change', sortRowsLive);
+  sortRowsLive(); updateTimestamp();
+}
 
-    // Initial + periodic refresh
-    renderAll();
-    setInterval(renderAll, AUTO_REFRESH_MS);
-  </script>
+function sortRowsLive(){
+  const sel=document.getElementById('sortby').value;
+  const rows=[...grid.children];
+  if(sel==='name'){ rows.sort((a,b)=> a.id.localeCompare(b.id)); }
+  else{ rows.sort((a,b)=> (parseFloat(b.dataset.score||'0') - parseFloat(a.dataset.score||'0'))); }
+  rows.forEach(r=>grid.appendChild(r));
+}
+
+/* =========================
+   ACTIONS
+   ========================= */
+function renderAll(){
+  grid.innerHTML=''; lastBench=null; // force re-fetch QQQ once
+  getWatchlist().forEach(it=>buildRow(it));
+  sortRowsLive(); updateTimestamp();
+}
+function addOrUpdate(){
+  const s=document.getElementById('in-symbol').value.trim();
+  const n=document.getElementById('in-name').value.trim()||s;
+  const t=document.getElementById('in-trend').value.trim()||n;
+  if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
+  const key=yTicker(s); const list=getWatchlist(); const i=list.findIndex(x=>yTicker(x.symbol)===key);
+  if(i===-1) list.push({symbol:s,name:n,trendTerm:t}); else list[i]={symbol:s,name:n,trendTerm:t};
+  setWatchlist(list);
+  document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
+  renderAll();
+}
+function removeStock(symbol){
+  const key=yTicker(symbol);
+  const list=getWatchlist().filter(x=>yTicker(x.symbol)!==key); setWatchlist(list); renderAll();
+}
+function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
+function updateTimestamp(){
+  const el=document.getElementById('last-updated'); if(!el) return;
+  el.textContent='Last updated: '+new Date().toLocaleTimeString(); el.style.color='var(--good)'; setTimeout(()=>el.style.color='var(--muted)',1200);
+}
+
+document.getElementById('btn-add').addEventListener('click', addOrUpdate);
+document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+document.getElementById('btn-refresh').addEventListener('click', renderAll);
+document.getElementById('sortby').addEventListener('change', sortRowsLive);
+
+/* start */
+renderAll();
+setInterval(renderAll, AUTO_REFRESH_MS);
+</script>
 </body>
 </html>
-
-
