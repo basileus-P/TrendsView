@@ -80,6 +80,93 @@
   <!-- Google Trends embed loader -->
   <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
   <script>
+
+    /**********************
+ * PROXY FETCH (throttled + cached)
+ **********************/
+const PROXIES = [
+  // Order matters; we rotate/retry with backoff on 429/5xx
+  (url) => `https://r.jina.ai/http://${url.replace(/^https?:\/\//,'')}`,
+  (url) => `https://r.jina.ai/https://${url.replace(/^https?:\/\//,'')}`,
+  (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://cors.isomorphic-git.org/${url}`,
+];
+
+const FETCH_CONCURRENCY = 2;       // don’t open too many at once (avoid 429)
+const FETCH_DELAY_MS    = 250;     // small gap between tasks
+const CACHE_TTL_MS      = 10*60*1000; // 10 min
+
+let activeTasks = 0;
+const taskQueue = [];
+function enqueueTask(fn){ return new Promise((resolve,reject)=>{ taskQueue.push({fn,resolve,reject}); pump(); }); }
+async function pump(){
+  if(activeTasks >= FETCH_CONCURRENCY || taskQueue.length===0) return;
+  const {fn,resolve,reject} = taskQueue.shift();
+  activeTasks++;
+  try{ const res = await fn(); resolve(res); }
+  catch(e){ reject(e); }
+  finally{
+    activeTasks--;
+    setTimeout(pump, FETCH_DELAY_MS);
+  }
+}
+
+// simple session cache
+function cacheGet(key){
+  try{
+    const raw = sessionStorage.getItem('cache:'+key);
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    if(Date.now() - obj.t > CACHE_TTL_MS) return null;
+    return obj.v;
+  }catch{ return null; }
+}
+function cacheSet(key, val){
+  try{ sessionStorage.setItem('cache:'+key, JSON.stringify({t:Date.now(), v:val})); }catch{}
+}
+
+// fetch via rotating proxies + backoff; returns TEXT
+async function proxyFetchText(url){
+  const cacheKey = url;
+  const cached = cacheGet(cacheKey);
+  if(cached) return cached;
+
+  const tryOnce = async (proxify, attempt) => {
+    const proxURL = proxify(url) + (proxify===PROXIES[3] || proxify===PROXIES[2] ? '' : (url.includes('?')?'&':'?')+'noCache='+Date.now());
+    const r = await fetch(proxURL, { method:'GET' });
+    if(!r.ok){
+      // backoff for 429/503
+      if(r.status===429 || r.status===503){
+        const wait = Math.min(2000 * attempt, 8000);
+        await new Promise(res=>setTimeout(res, wait));
+      }
+      throw new Error('status '+r.status);
+    }
+    const txt = await r.text();
+    if(!txt || txt.trim()==='') throw new Error('empty');
+    return txt;
+  };
+
+  let lastErr;
+  // 2 rounds across proxies (in case some rate-limit)
+  for(let round=1; round<=2; round++){
+    for(let i=0;i<PROXIES.length;i++){
+      try{
+        const txt = await tryOnce(PROXIES[i], round);
+        cacheSet(cacheKey, txt);
+        return txt;
+      }catch(e){ lastErr = e; }
+    }
+  }
+  throw lastErr || new Error('all proxies failed');
+}
+
+// public wrapper you can call elsewhere
+function getRaw(url){
+  return enqueueTask(()=>proxyFetchText(url));
+}
+
     /**********************
      * CONFIG
      **********************/
@@ -145,7 +232,7 @@
     }
    async function fetchStooqDailyCSV(sym){
   const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
-  const text = await getRaw(url);            // <— use proxy fetch
+  const text = await getRaw(url);
   const lines = text.trim().split('\n');
   if(lines.length<2) throw new Error('stooq empty');
   const hdr = lines.shift().split(',');
@@ -400,15 +487,15 @@
     /**********************
      * NEWS (Google News RSS via r.jina.ai)
      **********************/
-    function relTime(d){
-      const t = new Date(d).getTime(); if(!isFinite(t)) return '';
-      const mins = Math.max(1, Math.round((Date.now() - t)/60000));
-      if (mins < 60) return `${mins}m`; const hrs = Math.round(mins/60);
-      if (hrs < 24) return `${hrs}h`; return `${Math.round(hrs/24)}d`;
-    }
-  async function fetchNewsItems(query){
-  // Yahoo News RSS is easier to proxy than Google News RSS
-  const url = `https://news.search.yahoo.com/rss?p=${encodeURIComponent(query)}`;
+   function relTime(d){
+  const t = new Date(d).getTime(); if(!isFinite(t)) return '';
+  const mins = Math.max(1, Math.round((Date.now() - t)/60000));
+  if (mins < 60) return `${mins}m`; const hrs = Math.round(mins/60);
+  if (hrs < 24) return `${hrs}h`; return `${Math.round(hrs/24)}d`;
+}
+
+async function fetchNewsItems(query){
+  const url = `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=RSS`;
   const xmlText = await getRaw(url);
   const doc = new DOMParser().parseFromString(xmlText, "text/xml");
   const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
@@ -620,4 +707,5 @@
   </script>
 </body>
 </html>
+
 
