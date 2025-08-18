@@ -43,10 +43,12 @@
   .news a{color:var(--accent);text-decoration:none}
   .news a:hover{text-decoration:underline}
   .news time{color:var(--muted);font-size:11px;margin-left:6px}
-  /* TradingView height hygiene */
+
+  /* TradingView hygiene */
   .tradingview-widget-container{height:100%}
   .tradingview-widget-container__widget{height:100% !important; min-height:320px}
   .row .card:first-child{overflow:hidden}
+
   @media(max-width:980px){.row{grid-template-columns:1fr}}
 </style>
 </head>
@@ -74,18 +76,20 @@
 <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
 <script>
 /* =========================
-   SETTINGS
+   CONFIG
    ========================= */
-const STORAGE_KEY='WATCHLIST_PREBREAKOUT_V2';
+const STORAGE_KEY='WATCHLIST_PREBREAKOUT_V3';
 const DEFAULT_WATCHLIST=[
   { symbol:"NASDAQ:MVIS", name:"MicroVision (MVIS)", trendTerm:"MicroVision" },
   { symbol:"NASDAQ:QSI",  name:"Quantum-Si (QSI)",   trendTerm:"Quantum-Si" },
   { symbol:"NASDAQ:REKR", name:"Rekor Systems (REKR)", trendTerm:"Rekor Systems" }
 ];
-const TRENDS_GEO="";                  // worldwide
-const TRENDS_TIME="today 1-m";        // 1 month
-const BENCHMARK="QQQ";                // for RS
-const AUTO_REFRESH_MS=6*60*1000;      // refresh cadence (6m helps dodge 429s)
+const TRENDS_GEO="";               // worldwide
+const TRENDS_TIME="today 1-m";     // 1 month
+const BENCHMARK="QQQ";             // RS baseline
+const AUTO_REFRESH_MS=7*60*1000;   // 7m to avoid 429 storms
+const Y_RANGE='1y';                // Yahoo range
+const Y_INTERVAL='1d';
 
 /* =========================
    PROXY FETCH (queue + cache + backoff)
@@ -125,7 +129,8 @@ async function proxyFetchText(url){
     for(const make of PROXIES){
       try{
         const prox=make(url);
-        const withBuster = prox + (prox.includes('allorigins')||prox.includes('freeboard')||prox.includes('codetabs') ? '' : (prox.includes('?')?'&':'?')+'noCache='+Date.now());
+        const withBuster = prox + (prox.includes('allorigins')||prox.includes('freeboard')||prox.includes('codetabs')
+                                   ? '' : (prox.includes('?')?'&':'?')+'noCache='+Date.now());
         const r=await fetch(withBuster,{method:'GET'});
         if(!r.ok){
           if(r.status===429||r.status===503){ await new Promise(res=>setTimeout(res, Math.min(2000*round,8000))); }
@@ -142,7 +147,7 @@ async function proxyFetchText(url){
 function getRaw(url){ return enqueueTask(()=>proxyFetchText(url)); }
 
 /* =========================
-   WATCHLIST STORAGE
+   STORAGE / IDs
    ========================= */
 function getWatchlist(){
   try{ const raw=localStorage.getItem(STORAGE_KEY);
@@ -152,34 +157,46 @@ function getWatchlist(){
 }
 function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
 function yTicker(sym){ return String(sym||'').split(':').pop().trim().toUpperCase(); }
-function stooqSymbol(sym){ return yTicker(sym).toLowerCase()+'.us'; }
 function rowIdFromSymbol(symbol){ return 'row-'+yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
 function cid(rid,key){ return `${key}-${rid}`; }
 
 /* =========================
-   UTIL
+   MATH / INDICATORS
    ========================= */
 const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
 function stdev(a){ const m=mean(a); return Math.sqrt(mean(a.map(x=>(x-m)*(x-m)))); }
 function sma(arr,n){ const s=arr.slice(-n); return s.reduce((a,b)=>a+b,0)/Math.max(1,s.length); }
 function percentileRank(arr,val){ if(!arr.length) return 0; let below=0; for(const v of arr){ if(v<=val) below++; } return below/arr.length; }
 function trueRange(h,l,pc){ return Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc)); }
-function relTime(d){ const t=new Date(d).getTime(); if(!isFinite(t)) return ''; const m=Math.max(1,Math.round((Date.now()-t)/60000)); if(m<60)return m+'m'; const h=Math.round(m/60); if(h<24)return h+'h'; return Math.round(h/24)+'d'; }
 
 /* =========================
-   DATA FETCHERS (Stooq / News)
+   YAHOO CHART JSON (via proxy)
    ========================= */
-async function fetchStooqDailyCSV(sym){
-  const url=`https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
-  const text=await getRaw(url);
-  const lines=text.trim().split('\n'); if(lines.length<2) throw new Error('stooq empty');
-  const hdr=lines.shift().split(','); const idx=Object.fromEntries(hdr.map((h,i)=>[h,i]));
-  return lines.map(line=>{
-    const c=line.split(',');
-    return { date:c[idx['Date']], open:+c[idx['Open']], high:+c[idx['High']], low:+c[idx['Low']], close:+c[idx['Close']], volume:+c[idx['Volume']] };
-  }).filter(r=>Number.isFinite(r.close)&&Number.isFinite(r.volume));
+async function fetchYahooChart(symbol, range=Y_RANGE, interval=Y_INTERVAL){
+  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&includePrePost=false&events=div%7Csplit`;
+  const txt=await getRaw(url);
+  // Sometimes proxies wrap or inject junk; be defensive
+  const safe = txt.trim().replace(/^[^{\[]+/, ''); // drop any leading junk before JSON
+  const data=JSON.parse(safe);
+  const res=data?.chart?.result?.[0];
+  if(!res) throw new Error('no chart result');
+  const q=res.indicators?.quote?.[0]||{};
+  const ts=res.timestamp||[];
+  const out=[];
+  for(let i=0;i<ts.length;i++){
+    const o=q.open?.[i], h=q.high?.[i], l=q.low?.[i], c=q.close?.[i], v=q.volume?.[i];
+    if(Number.isFinite(c) && Number.isFinite(v) && Number.isFinite(h) && Number.isFinite(l)){
+      out.push({ date:new Date(ts[i]*1000).toISOString().slice(0,10), open:o??c, high:h, low:l, close:c, volume:v });
+    }
+  }
+  if(out.length<50) throw new Error('not enough bars');
+  return out;
 }
 
+/* =========================
+   NEWS (Bing RSS via proxy)
+   ========================= */
+function relTime(d){ const t=new Date(d).getTime(); if(!isFinite(t)) return ''; const m=Math.max(1,Math.round((Date.now()-t)/60000)); if(m<60)return m+'m'; const h=Math.round(m/60); if(h<24)return h+'h'; return Math.round(h/24)+'d'; }
 async function fetchNewsItems(query){
   const url=`https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=RSS`;
   const xml=await getRaw(url);
@@ -209,7 +226,6 @@ function renderTrends(container, keyword){
     const iframe=document.createElement('iframe'); iframe.src=src; iframe.width='100%'; iframe.height='360'; iframe.frameBorder='0'; container.appendChild(iframe);
   }catch(e){ const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends error: '+e.message; container.appendChild(err); }
 }
-
 function renderTradingView(container, symbol){
   container.style.height='400px';
   const wrap=document.createElement('div'); wrap.className='tradingview-widget-container';
@@ -234,7 +250,7 @@ function renderSparkline(el, arr){
 }
 
 /* =========================
-   PRE-BREAKOUT SCORE
+   PRE-BREAKOUT SCORE (same logic, runs on Yahoo bars)
    ========================= */
 function computePreBreakout(rows, benchRows){
   if(rows.length<220 || benchRows.length<60) return {score:0,detail:null};
@@ -294,15 +310,15 @@ function computePreBreakout(rows, benchRows){
 }
 
 /* =========================
-   BUILD / RENDER
+   UI BUILD / RENDER
    ========================= */
 const grid=document.getElementById('grid');
-let lastBench=null;
+let benchCache=null;
 
 async function getBenchmarkRows(){
-  if(lastBench && (Date.now()-lastBench.t<CACHE_TTL_MS)) return lastBench.rows;
-  const rows=await fetchStooqDailyCSV(stooqSymbol(BENCHMARK));
-  lastBench={rows,t:Date.now()}; return rows;
+  if(benchCache && (Date.now()-benchCache.t<CACHE_TTL_MS)) return benchCache.rows;
+  const rows=await fetchYahooChart(BENCHMARK,Y_RANGE,Y_INTERVAL);
+  benchCache={rows,t:Date.now()}; return rows;
 }
 
 function buildRow(item){
@@ -349,8 +365,11 @@ function tag(ok,label,mid=false){ return `<span class="pill ${ok?'ok':(mid?'warn
 async function fillRowData(item){
   const rid=rowIdFromSymbol(item.symbol);
   try{
-    const sym=stooqSymbol(item.symbol);
-    const [rows, brow]=await Promise.all([ fetchStooqDailyCSV(sym), getBenchmarkRows() ]);
+    const [rows, brow]=await Promise.all([
+      fetchYahooChart(yTicker(item.symbol), Y_RANGE, Y_INTERVAL),
+      getBenchmarkRows()
+    ]);
+
     renderSparkline(document.getElementById(cid(rid,'spark')), rows.slice(-30).map(r=>r.close));
 
     const pb=computePreBreakout(rows,brow);
@@ -372,11 +391,10 @@ async function fillRowData(item){
     const lo=document.getElementById(cid(rid,'lo-tags'));
     if(lo) lo.innerHTML=[ tag(d?.LOC?.nearHigh,'2–8% under 30-high'), tag(d?.LOC?.ma50OK,'50-DMA rising & above') ].join(' ');
 
-    const row=document.getElementById(rid); if(row) row.dataset.score = String(pb.score||0);
+    const row=document.getElementById(rid); if(row) row.dataset.score=String(pb.score||0);
   }catch(e){
     console.error('calc error', item.symbol, e);
     const row=document.getElementById(rid); if(row) row.dataset.score='0';
-    // placeholders
     ['sq-tags','ac-tags','ld-tags','lo-tags','spark','score','news'].forEach(k=>{
       const el=document.getElementById(`${k}-${rid}`); if(!el) return;
       if(k==='score'){ el.textContent='—'; el.className='score'; }
@@ -385,7 +403,7 @@ async function fillRowData(item){
     });
   }
 
-  // News (don’t block radar if it fails)
+  // News (don’t block the row)
   try{
     const q=`${yTicker(item.symbol)} stock OR ${item.name.replace(/\(.*?\)/g,'').trim()} stock`;
     const items=await fetchNewsItems(q);
@@ -414,8 +432,12 @@ function sortRowsLive(){
 /* =========================
    ACTIONS
    ========================= */
+function updateTimestamp(){
+  const el=document.getElementById('last-updated'); if(!el) return;
+  el.textContent='Last updated: '+new Date().toLocaleTimeString(); el.style.color='var(--good)'; setTimeout(()=>el.style.color='var(--muted)',1200);
+}
 function renderAll(){
-  grid.innerHTML=''; lastBench=null; // force re-fetch QQQ once
+  grid.innerHTML=''; benchCache=null; // re-fetch QQQ once
   getWatchlist().forEach(it=>buildRow(it));
   sortRowsLive(); updateTimestamp();
 }
@@ -435,17 +457,13 @@ function removeStock(symbol){
   const list=getWatchlist().filter(x=>yTicker(x.symbol)!==key); setWatchlist(list); renderAll();
 }
 function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
-function updateTimestamp(){
-  const el=document.getElementById('last-updated'); if(!el) return;
-  el.textContent='Last updated: '+new Date().toLocaleTimeString(); el.style.color='var(--good)'; setTimeout(()=>el.style.color='var(--muted)',1200);
-}
 
 document.getElementById('btn-add').addEventListener('click', addOrUpdate);
 document.getElementById('btn-reset').addEventListener('click', resetDefaults);
 document.getElementById('btn-refresh').addEventListener('click', renderAll);
 document.getElementById('sortby').addEventListener('change', sortRowsLive);
 
-/* start */
+/* boot */
 renderAll();
 setInterval(renderAll, AUTO_REFRESH_MS);
 </script>
