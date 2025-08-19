@@ -100,7 +100,7 @@
       { symbol: "NASDAQ:QSI",  name: "Quantum-Si (QSI)",   trendTerm: "Quantum-Si" },
       { symbol: "NASDAQ:REKR", name: "Rekor Systems (REKR)", trendTerm: "Rekor Systems" }
     ];
-    const STORAGE_KEY = 'WATCHLIST_V3'; // bump for stability changes
+    const STORAGE_KEY = 'WATCHLIST_V3'; // baseline you liked
 
     // Trends embed settings
     const TRENDS_GEO  = "";            // Worldwide
@@ -156,6 +156,8 @@
     const grid = document.getElementById('grid');
 
     function renderTradingView(container, symbol){
+      // clear to avoid double-inject / overlap
+      container.innerHTML = '';
       const wrap=document.createElement('div');
       wrap.className='tradingview-widget-container';
       const widget=document.createElement('div');
@@ -166,7 +168,7 @@
       s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
       s.async=true;
       s.innerHTML=JSON.stringify({
-        symbols:[[symbol+"|1D"]],chartOnly:false,width:"100%",height:"100%",locale:"en",autosize:true,dateRange:"12M",showVolume:true,showMA:true
+        symbols:[[symbol+"|1D"]],chartOnly:false,width:"100%",height:"100%",locale:"en",autosize:true,dateRange:"12M",showVolume:true,showMA:true,colorTheme:"dark"
       });
       wrap.appendChild(s);
       container.appendChild(wrap);
@@ -184,7 +186,7 @@
         }
         const src = `https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
         const iframe=document.createElement('iframe');
-        iframe.src=src; iframe.width='100%'; iframe.height='100%'; iframe.frameBorder='0';
+        iframe.src=src; iframe.width='100%'; iframe.height='100%'; iframe.frameBorder='0'; iframe.loading='lazy';
         container.appendChild(iframe);
       }catch(e){
         const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends embed error: '+e.message; container.appendChild(err);
@@ -192,22 +194,53 @@
     }
 
     /* =============================
-       RESILIENT CORS PROXIES (Yahoo + RSS)
+       LIGHT RATE-LIMITING FETCH (keeps your proxies)
        ============================= */
+    const MAX_CONCURRENCY = 2;
+    let inflight = 0;
+    const waiters = [];
+    function withLimit(fn){
+      return new Promise(async (resolve,reject)=>{
+        const enter = async ()=>{
+          inflight++;
+          try{ resolve(await fn()); }
+          catch(e){ reject(e); }
+          finally{
+            inflight--;
+            const nxt = waiters.shift();
+            if(nxt) nxt();
+          }
+        };
+        if(inflight >= MAX_CONCURRENCY) waiters.push(enter); else enter();
+      });
+    }
+
     async function getRaw(url) {
-      const candidates = [
+      const proxies = [
         'https://cors.isomorphic-git.org/' + url,
         'https://corsproxy.io/?' + encodeURIComponent(url),
         'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
       ];
-      const addBuster = u => u + (u.includes('?') ? '&' : '?') + 'noCache=' + Date.now();
+      const bust = u => u + (u.includes('?') ? '&' : '?') + 'nc=' + (Date.now() + Math.floor(Math.random()*1000));
       let lastErr;
-      for (const prox of candidates) {
-        try {
-          const r = await fetch(addBuster(prox));
-          if (!r.ok) throw new Error('proxy status ' + r.status);
-          return await r.text();
-        } catch (e) { lastErr = e; }
+      for (const p of proxies) {
+        for (let attempt=1; attempt<=2; attempt++){
+          try{
+            const txt = await withLimit(async ()=>{
+              const r = await fetch(bust(p));
+              if(!r.ok){
+                if(r.status===429 || r.status>=500) throw new Error('retry '+r.status);
+                throw new Error('status '+r.status);
+              }
+              return r.text();
+            });
+            return txt;
+          }catch(e){
+            lastErr = e;
+            // small jittered backoff
+            await new Promise(r=>setTimeout(r, 200*attempt + Math.random()*300));
+          }
+        }
       }
       throw lastErr || new Error('all proxies failed');
     }
@@ -321,9 +354,9 @@
       const doc = new DOMParser().parseFromString(xmlText, "text/xml");
       const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
         const title = node.getElementsByTagName('title')[0]?.textContent || '';
-               const link = node.getElementsByTagName('link')[0]?.textContent || '#';
-        const pub  = node.getElementsByTagName('pubDate')[0]?.textContent || '';
-        const source = node.getElementsByTagName('source')[0]?.textContent || '';
+        const link  = node.getElementsByTagName('link')[0]?.textContent || '#';
+        const pub   = node.getElementsByTagName('pubDate')[0]?.textContent || '';
+        const source= node.getElementsByTagName('source')[0]?.textContent || '';
         return { title, link, pub, source };
       });
       return items;
@@ -518,10 +551,9 @@
     // Auto-refresh radar + resort every 5 minutes
     setInterval(renderAllSorted, REFRESH_MS);
 
-    // Auto-refresh news every 15 minutes
+    // Auto-refresh news every 15 minutes (only mounts that exist)
     setInterval(async () => {
       const list = getWatchlist();
-      // refresh only news mounts that exist
       list.forEach((it) => {
         const rid = rowIdFromSymbol(it.symbol);
         const mount = document.getElementById(cellId(rid,'news'));
