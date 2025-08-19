@@ -101,7 +101,9 @@
 <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
 <script>
 /* ========= Config (same spirit as your main page) ========= */
-const DEFAULT_WATCHLIST = [
+const PROXY = "https://raspy-bush-72eb.ramanauskas-j.workers.dev/"; // ← your worker URL + /fetch?url=
+
+  const DEFAULT_WATCHLIST = [
   { symbol: "NASDAQ:MVIS", name: "MicroVision (MVIS)", trendTerm: "MicroVision" },
   { symbol: "NASDAQ:QSI",  name: "Quantum-Si (QSI)",   trendTerm: "Quantum-Si" },
   { symbol: "NASDAQ:REKR", name: "Rekor Systems (REKR)", trendTerm: "Rekor Systems" }
@@ -151,30 +153,20 @@ function relTime(d){
 }
 
 /* ========= Gentle fetch with tiny concurrency (prevents 429 storms) ========= */
-const MAX_CONCURRENCY=2; let inflight=0; const q=[];
-function withLimit(fn){ return new Promise((res,rej)=>{ const go=async()=>{ inflight++; try{ res(await fn()); }catch(e){ rej(e); } finally{ inflight--; const n=q.shift(); if(n) n(); } }; if(inflight>=MAX_CONCURRENCY) q.push(go); else go(); }); }
-async function getRaw(url){
-  const proxies=[
-    'https://cors.isomorphic-git.org/'+url,
-    'https://corsproxy.io/?'+encodeURIComponent(url),
-    'https://api.allorigins.win/raw?url='+encodeURIComponent(url)
-  ];
-  const bust=u=>u+(u.includes('?')?'&':'?')+'nc='+(Date.now()+Math.floor(Math.random()*999));
-  let last;
-  for(const p of proxies){
-    for(let attempt=1;attempt<=2;attempt++){
-      try{
-        return await withLimit(async ()=>{
-          const r=await fetch(bust(p));
-          if(!r.ok){ if(r.status===429||r.status>=500) throw new Error('retry '+r.status); throw new Error('status '+r.status); }
-          return r.text();
-        });
-      }catch(e){ last=e; await new Promise(r=>setTimeout(r, 150*attempt+Math.random()*250)); }
-    }
-  }
-  throw last||new Error('all proxies failed');
+const MAX_CONCURRENCY = 2; let inflight = 0; const queue = [];
+function withLimit(fn){ return new Promise((res,rej)=>{ const run=async()=>{ inflight++; try{ res(await fn()); }catch(e){ rej(e); } finally{ inflight--; const n=queue.shift(); if(n) n(); } }; (inflight>=MAX_CONCURRENCY)?queue.push(run):run(); });}
+
+async function getRaw(url) {
+  const prox = PROXY + encodeURIComponent(url) + "&nc=" + Date.now();
+  const r = await fetch(prox, { method: "GET" });
+  if (!r.ok) throw new Error("proxy status " + r.status);
+  return r.text();
 }
-async function getJSON(url){ const t=await getRaw(url); try{ return JSON.parse(t); }catch{ throw new Error('bad JSON'); } }
+async function getJSON(url) {
+  const t = await getRaw(url);
+  try { return JSON.parse(t); } catch { throw new Error("bad JSON"); }
+}
+const ch = await withLimit(()=>yahooChart(t, '1y', '1d'));
 
 /* ========= Data sources ========= */
 async function yahooChart(tkr, range='1y', interval='1d'){
@@ -536,4 +528,5 @@ setInterval(renderAll, 5*60*1000);
 </script>
 </body>
 </html>
+
 
