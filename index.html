@@ -1,363 +1,533 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Breakthrough Watch — Price • Trends (1m) • Radar + News</title>
-<style>
-  :root{
-    --bg:#0b0f14;--panel:#111826;--border:#1c2633;--text:#e6eef7;--muted:#9fb3c8;
-    --good:#19c37d;--warn:#eab308;--bad:#ef4444;--accent:#8fb6ff
-  }
-  html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#0a1018;position:sticky;top:0;z-index:5}
-  h1{margin:0;font-size:18px}
-  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .toolbar input{background:#0e1522;border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text)}
-  .toolbar button,.toolbar select{background:#152235;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
-  .toolbar button:hover{filter:brightness(1.08)}
-  #last-updated{color:var(--muted);font-size:12px}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>INDEX — Stocks + Trends + Breakout Radar</title>
+  <style>
+    :root {
+      --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8;
+      --good:#19c37d; --bad:#d66; --warn:#d6a019; --accent:#8fb6ff; --chip:#0e1522;
+    }
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 
-  .container{display:flex;flex-direction:column;gap:16px;padding:16px}
-  .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative;min-height:120px}
-  .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600}
-  .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
-  .remove-btn:hover{filter:brightness(1.1)}
-  .score{font-size:22px;font-weight:800;margin:2px 0 6px}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--border);margin-left:8px;color:var(--muted)}
-  .score.good{color:var(--good)} .score.mid{color:var(--warn)} .score.bad{color:var(--bad)}
-  .kv{display:flex;justify-content:space-between;gap:12px;margin:3px 0}
-  .kv .lab{color:var(--muted)}
-  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;margin:2px 4px 0 0;border:1px solid var(--border)}
-  .ok{color:var(--good);border-color:rgba(25,195,125,.35)}
-  .warn{color:var(--warn);border-color:rgba(234,179,8,.35)}
-  .no{color:var(--bad);border-color:rgba(239,68,68,.35)}
-  .spark{height:34px;width:100%;margin-top:6px}
-  .sep{height:1px;background:var(--border);margin:8px 0}
-  .news h3{margin:10px 0 6px;font-size:12px;color:var(--muted)}
-  .news ul{list-style:none;margin:0;padding:0}
-  .news li{margin:6px 0}
-  .news a{color:var(--accent);text-decoration:none}
-  .news a:hover{text-decoration:underline}
-  .news time{color:var(--muted);font-size:11px;margin-left:6px}
+    /* Project Tabs (so INDEX is its own window) */
+    .tabs{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);background:#0a1018;position:sticky;top:0;z-index:5}
+    .tab{padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:#0f1826;color:var(--muted);text-decoration:none;cursor:pointer}
+    .tab.active{background:#172335;color:#fff;border-color:#223146}
+    .tab.disabled{opacity:.55;cursor:not-allowed}
 
-  .tradingview-widget-container{height:100%}
-  .tradingview-widget-container__widget{height:100% !important; min-height:320px}
-  .row .card:first-child{overflow:hidden}
+    header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+    h1{margin:0;font-size:18px}
+    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .toolbar input{background:#0e1522;border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text)}
+    .toolbar button{background:#152235;border:1px solid var(--border);color:#e6eef7;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .toolbar button:hover{filter:brightness(1.1)}
+    #last-updated{color:var(--muted);font-size:12px}
 
-  @media(max-width:980px){.row{grid-template-columns:1fr}}
-</style>
+    .container{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:16px;align-items:start}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative}
+    .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.2px;padding-right:36px}
+    .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
+    .remove-btn:hover{filter:brightness(1.1)}
+    .strength-badge{position:absolute;top:10px;left:10px;background:var(--chip);border:1px solid var(--border);padding:4px 8px;border-radius:8px;font-size:12px;color:var(--muted)}
+    .strength-badge strong{color:#fff}
+
+    .chart{height:400px}
+    .trend{height:360px}
+
+    table{width:100%;border-collapse:collapse;color:var(--text)}
+    th,td{border-color:var(--border);padding:6px 4px}
+    th{border-bottom:1px solid var(--border);text-align:left}
+    td.val{text-align:right}
+    td.sig{text-align:center;width:60px}
+    .ok{color:var(--good);font-weight:600}
+    .ko{color:var(--muted)}
+    .warn{color:var(--warn)}
+
+    .spark{height:44px}
+    .spark svg{width:100%;height:44px;display:block}
+    .spark .line{fill:none;stroke:var(--accent);stroke-width:2}
+    .spark .fill{fill:rgba(143,182,255,0.12);stroke:none}
+    .spark .axis{stroke:#233046;stroke-width:1}
+
+    .news{margin-top:10px}
+    .news h3{margin:8px 0 4px;font-size:12px;color:var(--muted)}
+    .news ul{list-style:none;padding:0;margin:0}
+    .news li{margin:6px 0}
+    .news a{color:var(--accent);text-decoration:none}
+    .news a:hover{text-decoration:underline}
+    .news time{color:var(--muted);font-size:11px;margin-left:6px}
+
+    @media (max-width:980px){
+      .container{grid-template-columns:1fr}
+      .chart,.trend{height:300px}
+    }
+  </style>
 </head>
 <body>
-<header>
-  <h1>Breakthrough Watch — Price • Trends (1m) • Radar + News</h1>
-  <div class="toolbar">
-    <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26"/>
-    <input id="in-name" placeholder="Display name" size="18"/>
-    <input id="in-trend" placeholder="Google Trends term" size="18"/>
-    <button id="btn-add">Add / Update</button>
-    <button id="btn-reset">Reset defaults</button>
-    <button id="btn-refresh">Refresh Now</button>
-    <select id="sortby"><option value="score">Sort: Score (desc)</option><option value="name">Sort: Name (A→Z)</option></select>
-    <span id="last-updated"></span>
-  </div>
-</header>
+  <!-- Project Tabs (INDEX = current project window) -->
+  <nav class="tabs">
+    <span class="tab active" title="This dashboard">INDEX</span>
+    <span class="tab disabled" title="Reserved for future modules">SCREENERS</span>
+    <span class="tab disabled" title="Reserved for settings">SETTINGS</span>
+  </nav>
 
-<div id="grid" class="container"></div>
+  <header>
+    <h1>Stocks (left) • Google Trends (middle) • Breakout Radar (right)</h1>
+    <div class="toolbar">
+      <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26" />
+      <input id="in-name" placeholder="Display name" size="18" />
+      <input id="in-trend" placeholder="Google Trends term" size="18" />
+      <button id="btn-add">Add / Update</button>
+      <button id="btn-reset">Reset defaults</button>
+      <button id="btn-refresh">Refresh Now</button>
+      <span id="last-updated"></span>
+    </div>
+  </header>
 
-<script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
-<script>
-/* ===== YOU MUST SET THIS TO YOUR WORKER ===== */
-const PROXY_BASE = 'https://raspy-bush-72eb.ramanauskas-j.workers.dev/';
+  <div id="grid" class="container"></div>
 
-/* ===== CONFIG ===== */
-const STORAGE_KEY='WATCHLIST_PREBREAKOUT_V4';
-const DEFAULT_WATCHLIST=[
-  { symbol:"NASDAQ:MVIS", name:"MicroVision (MVIS)", trendTerm:"MicroVision" },
-  { symbol:"NASDAQ:QSI",  name:"Quantum-Si (QSI)",   trendTerm:"Quantum-Si" },
-  { symbol:"NASDAQ:REKR", name:"Rekor Systems (REKR)", trendTerm:"Rekor Systems" }
-];
-const TRENDS_GEO=""; const TRENDS_TIME="today 1-m";
-const BENCHMARK="QQQ"; const AUTO_REFRESH_MS=7*60*1000;
-const Y_RANGE='1y', Y_INTERVAL='1d';
+  <!-- Google Trends embed loader -->
+  <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
+  <script>
+    /* =============================
+       CONFIG
+       ============================= */
+    const DEFAULT_WATCHLIST = [
+      { symbol: "NASDAQ:MVIS", name: "MicroVision (MVIS)", trendTerm: "MicroVision" },
+      { symbol: "NASDAQ:QSI",  name: "Quantum-Si (QSI)",   trendTerm: "Quantum-Si" },
+      { symbol: "NASDAQ:REKR", name: "Rekor Systems (REKR)", trendTerm: "Rekor Systems" }
+    ];
+    const STORAGE_KEY = 'WATCHLIST_V3'; // bump for stability changes
 
-/* ===== HELPERS ===== */
-const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
-function stdev(a){ const m=mean(a); return Math.sqrt(mean(a.map(x=>(x-m)*(x-m)))); }
-function sma(arr,n){ const s=arr.slice(-n); return s.reduce((a,b)=>a+b,0)/Math.max(1,s.length); }
-function percentileRank(arr,val){ if(!arr.length) return 0; let below=0; for(const v of arr){ if(v<=val) below++; } return below/arr.length; }
-function trueRange(h,l,pc){ return Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc)); }
-function yTicker(sym){ return String(sym||'').split(':').pop().trim().toUpperCase(); }
-function rowIdFromSymbol(symbol){ return 'row-'+yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
-function cid(rid,key){ return `${key}-${rid}`; }
-function relTime(d){ const t=new Date(d).getTime(); if(!isFinite(t)) return ''; const m=Math.max(1,Math.round((Date.now()-t)/60000)); if(m<60)return m+'m'; const h=Math.round(m/60); if(h<24)return h+'h'; return Math.round(h/24)+'d'; }
+    // Trends embed settings
+    const TRENDS_GEO  = "";            // Worldwide
+    const TRENDS_TIME = "today 1-m";   // last 1 month
 
-function getWatchlist(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return DEFAULT_WATCHLIST.slice(); const arr=JSON.parse(raw); return Array.isArray(arr)&&arr.length?arr:DEFAULT_WATCHLIST.slice(); }catch{ return DEFAULT_WATCHLIST.slice(); } }
-function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
+    // Breakout metric params
+    const BENCHMARK = "QQQ";   // RS vs this ETF
+    const RS_LOOKBACK = 10;
+    const AVG_VOL_WINDOW = 20;
+    const HIGH_LOOKBACK = 30;
+    const MA50_WINDOW = 50;
+    const MA200_WINDOW = 200;
 
-/* ===== SINGLE PROXY FETCH ===== */
-async function getRawDirect(target){
-  const url = PROXY_BASE + encodeURIComponent(target);
-  const r = await fetch(url,{method:'GET'});
-  if(!r.ok) throw new Error('status '+r.status);
-  return await r.text();
-}
+    // thresholds
+    const THRESHOLDS = {
+      volVsAvg: 1.5,
+      nearHighPct: -0.10,
+      rsOutperformance: 0.01
+    };
 
-/* ===== DATA SOURCES THROUGH WORKER ===== */
-async function fetchYahooChart(symbol, range=Y_RANGE, interval=Y_INTERVAL){
-  const t = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&includePrePost=false&events=div%7Csplit`;
-  const txt = await getRawDirect(t);
-  const safe = txt.trim().replace(/^[^{\[]+/, '');
-  const data=JSON.parse(safe);
-  const res=data?.chart?.result?.[0];
-  if(!res) throw new Error('no chart result');
-  const q=res.indicators?.quote?.[0]||{};
-  const ts=res.timestamp||[];
-  const out=[];
-  for(let i=0;i<ts.length;i++){
-    const o=q.open?.[i], h=q.high?.[i], l=q.low?.[i], c=q.close?.[i], v=q.volume?.[i];
-    if(Number.isFinite(c) && Number.isFinite(v) && Number.isFinite(h) && Number.isFinite(l)){
-      out.push({ date:new Date(ts[i]*1000).toISOString().slice(0,10), open:o??c, high:h, low:l, close:c, volume:v });
+    // Strength weights
+    const SCORE_WEIGHTS = { volVsAvg: 0.35, rs: 0.25, nearHigh: 0.25, maStack: 0.15 };
+    const SCORE_CAPS    = { volVsAvg: 3.0,  rs: 0.05,  nearHigh: 0.10 };
+
+    // Auto-refresh
+    const REFRESH_MS = 5 * 60 * 1000;       // radar
+    const NEWS_REFRESH_MS = 15 * 60 * 1000; // news
+
+    /* =============================
+       STABLE IDS / KEYS
+       ============================= */
+    function yTicker(sym){ return String(sym || '').split(':').pop().trim().toUpperCase(); }
+    function rowIdFromSymbol(symbol){ return 'row-' + yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
+    function cellId(rowId, key){ return `${key}-${rowId}`; }
+
+    /* =============================
+       STORAGE
+       ============================= */
+    function getWatchlist(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return DEFAULT_WATCHLIST.slice();
+        const arr = JSON.parse(raw);
+        if(!Array.isArray(arr) || !arr.length) return DEFAULT_WATCHLIST.slice();
+        return arr;
+      }catch{ return DEFAULT_WATCHLIST.slice(); }
     }
-  }
-  if(out.length<50) throw new Error('not enough bars');
-  return out;
-}
+    function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
 
-async function fetchNewsItems(query){
-  const t = `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=RSS`;
-  const xml=await getRawDirect(t);
-  const doc=new DOMParser().parseFromString(xml,"text/xml");
-  return [...doc.getElementsByTagName('item')].slice(0,3).map(n=>{
-    const title=n.getElementsByTagName('title')[0]?.textContent||'';
-    const link =n.getElementsByTagName('link')[0]?.textContent||'#';
-    const pub  =n.getElementsByTagName('pubDate')[0]?.textContent||'';
-    const source=n.getElementsByTagName('source')[0]?.textContent||'';
-    return {title,link,pub,source};
-  });
-}
+    /* =============================
+       UI HELPERS (embeds)
+       ============================= */
+    const grid = document.getElementById('grid');
 
-/* ===== TRENDS / TRADINGVIEW ===== */
-function renderTrends(container, keyword){
-  try{
-    if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
-      trends.embed.renderExploreWidgetTo(
-        container,'TIMESERIES',
-        {comparisonItem:[{keyword,geo:TRENDS_GEO,time:TRENDS_TIME}],category:0,property:''},
-        {exploreQuery:`q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`,guestPath:'https://trends.google.com:443/trends/embed/'}
-      ); return;
+    function renderTradingView(container, symbol){
+      const wrap=document.createElement('div');
+      wrap.className='tradingview-widget-container';
+      const widget=document.createElement('div');
+      widget.className='tradingview-widget-container__widget';
+      wrap.appendChild(widget);
+      const s=document.createElement('script');
+      s.type='text/javascript';
+      s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
+      s.async=true;
+      s.innerHTML=JSON.stringify({
+        symbols:[[symbol+"|1D"]],chartOnly:false,width:"100%",height:"100%",locale:"en",autosize:true,dateRange:"12M",showVolume:true,showMA:true
+      });
+      wrap.appendChild(s);
+      container.appendChild(wrap);
     }
-    const src=`https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
-    const iframe=document.createElement('iframe'); iframe.src=src; iframe.width='100%'; iframe.height='360'; iframe.loading='lazy'; iframe.referrerPolicy='no-referrer-when-downgrade'; iframe.frameBorder='0';
-    container.appendChild(iframe);
-  }catch(e){ const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends error: '+e.message; container.appendChild(err); }
-}
-function renderTradingView(container, symbol){
-  container.style.height='400px';
-  const wrap=document.createElement('div'); wrap.className='tradingview-widget-container';
-  const widget=document.createElement('div'); widget.className='tradingview-widget-container__widget'; wrap.appendChild(widget);
-  container.innerHTML=''; container.appendChild(wrap);
-  const s=document.createElement('script'); s.type='text/javascript'; s.async=true;
-  s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
-  s.innerHTML=JSON.stringify({ symbols:[[symbol+'|1D']], autosize:true, locale:'en', dateRange:'12M', showVolume:true, showMA:true, colorTheme:'dark' });
-  setTimeout(()=>container.appendChild(s),0);
-}
 
-/* ===== SPARKLINE ===== */
-function renderSparkline(el, arr){
-  if(!el || !arr || arr.length<2){ el.innerHTML=''; return; }
-  const w=el.clientWidth||260, h=34, p=2;
-  const min=Math.min(...arr), max=Math.max(...arr), span=(max-min)||1;
-  const pts=arr.map((v,i)=>{ const x=p+(i*(w-2*p))/(arr.length-1); const y=h-p-((v-min)*(h-2*p))/span; return [x,y]; });
-  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-  el.innerHTML=`<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="#8fb6ff" stroke-width="1.5"/></svg>`;
-}
-
-/* ===== SCORE ===== */
-function computePreBreakout(rows, benchRows){
-  if(rows.length<220 || benchRows.length<60) return {score:0,detail:null};
-  const closes=rows.map(r=>r.close), highs=rows.map(r=>r.high), lows=rows.map(r=>r.low), vols=rows.map(r=>r.volume);
-
-  const TR=rows.map((r,i)=> i? trueRange(r.high,r.low,rows[i-1].close) : (r.high-r.low));
-  const ATR20=TR.map((_,i)=> i>=19? mean(TR.slice(i-19,i+1)) : NaN);
-  const atrPctSeries=ATR20.map((a,i)=> (i>=19&&closes[i]>0)? a/closes[i] : NaN).filter(Number.isFinite);
-  const atrPct=atrPctSeries.at(-1); const atrPctPerc=percentileRank(atrPctSeries.slice(-252), atrPct);
-
-  const BBwidthSeries=closes.map((_,i)=>{ if(i<19) return NaN; const win=closes.slice(i-19,i+1); const m=mean(win), sd=stdev(win); return (sd>0&&m>0)? (4*sd/m):NaN; }).filter(Number.isFinite);
-  const bbWidth=BBwidthSeries.at(-1); const bbPerc=percentileRank(BBwidthSeries.slice(-252), bbWidth);
-
-  const ranges=rows.map(r=>r.high-r.low);
-  function countNRn(n){ let c=0; for(let i=rows.length-10;i<rows.length;i++){ if(i<0) continue; const win=ranges.slice(i-n+1,i+1); if(win.length===n && ranges[i]===Math.min(...win)) c++; } return c; }
-  const hasNRcluster=(countNRn(7)>=2)||(countNRn(4)>=2);
-
-  let upVol=0,downVol=0; for(let i=rows.length-10;i<rows.length;i++){ if(i<=0) continue; const up=closes[i]>closes[i-1]; if(up) upVol+=vols[i]; else downVol+=vols[i]; }
-  const udRatio=(downVol>0)? upVol/downVol:0; const d10=closes.at(-1)/closes.at(-11)-1; const flat10=Math.abs(d10)<=0.03;
-
-  let obv=[0]; for(let i=1;i<rows.length;i++){ const sign=closes[i]>closes[i-1]?1:(closes[i]<closes[i-1]?-1:0); obv.push(obv[i-1]+sign*vols[i]); }
-  const obvSlope20=(function(){ const s=obv.slice(-20); if(s.length<2) return 0; const n=s.length; const x=Array.from({length:n},(_,i)=>i+1); const sx=x.reduce((a,b)=>a+b,0), sy=s.reduce((a,b)=>a+b,0); const sxx=x.reduce((a,b)=>a+b*b,0); const sxy=x.reduce((a,i)=>a+i*s[i-1],0); const denom=n*sxx-sx*sx; return Math.abs(denom)<1e-9?0:(n*sxy-sx*sy)/denom; })();
-
-  let ppivot=false; for(let k=rows.length-3;k<rows.length;k++){ if(k<=0) continue; const up=closes[k]>closes[k-1]; const winStart=Math.max(0,k-10); const downVols=[]; for(let j=winStart;j<k;j++){ if(closes[j]<closes[j-1]) downVols.push(vols[j]); } const maxDown=downVols.length?Math.max(...downVols):0; if(up && vols[k]>maxDown && closes[k]>sma(closes.slice(0,k+1),10)){ ppivot=true; break; } }
-
-  const bc=benchRows.map(r=>r.close); const minLen=Math.min(closes.length, bc.length);
-  const ratio=closes.slice(-minLen).map((c,i)=> c / bc.slice(-minLen)[i]);
-  const rsSlope10=(function(){ const s=ratio.slice(-10); if(s.length<2) return 0; const n=s.length; const x=Array.from({length:n},(_,i)=>i+1); const sx=x.reduce((a,b)=>a+b,0), sy=s.reduce((a,b)=>a+b,0); const sxx=x.reduce((a,b)=>a+b*b,0); const sxy=x.reduce((a,i)=>a+i*s[i-1],0); const denom=n*sxx-sx*sx; return Math.abs(denom)<1e-9?0:(n*sxy-sx*sy)/denom; })();
-  const rsPerc=percentileRank(ratio.slice(-60), ratio.at(-1));
-
-  const last=closes.at(-1); const high30=Math.max(...closes.slice(-30)); const distHigh=last/high30-1;
-  const sma50now=sma(closes,50); const sma50old=sma(closes.slice(0,-10),50); const ma50Rising=(sma50now && sma50old)?(sma50now>sma50old):false; const nearMA50=(last>sma50now)&&((last/sma50now-1)<=0.05);
-
-  const SQUEEZE={ atrLow: atrPctPerc<=0.20, bbLow: bbPerc<=0.20, nrx: hasNRcluster };
-  const ACCUM  ={ udOK: udRatio>=1.2 && flat10, obvUp: obvSlope20>0, pivot: ppivot };
-  const LEAD   ={ rsUp: rsSlope10>0, rsTop: rsPerc>=0.75 };
-  const LOC    ={ nearHigh: (distHigh<=-0.02 && distHigh>=-0.08), ma50OK: (ma50Rising && nearMA50) };
-
-  const pts=(b,ok)=> ok?b:0;
-  const score = pts(10,SQUEEZE.atrLow)+pts(10,SQUEEZE.bbLow)+pts(10,SQUEEZE.nrx)
-              + pts(10,ACCUM.udOK)+pts(10,ACCUM.obvUp)+pts(15,ACCUM.pivot)
-              + pts(10,LEAD.rsUp)+pts(15,LEAD.rsTop)
-              + pts(6,LOC.nearHigh)+pts(4,LOC.ma50OK);
-
-  return {score, detail:{SQUEEZE,ACCUM,LEAD,LOC}};
-}
-
-/* ===== UI ===== */
-const grid=document.getElementById('grid'); let benchCache=null;
-
-async function getBenchmarkRows(){
-  if(benchCache && (Date.now()-benchCache.t<10*60*1000)) return benchCache.rows;
-  const rows=await fetchYahooChart(BENCHMARK,Y_RANGE,Y_INTERVAL);
-  benchCache={rows,t:Date.now()}; return rows;
-}
-function tag(ok,label,mid=false){ return `<span class="pill ${ok?'ok':(mid?'warn':'no')}">${label}</span>`; }
-
-function buildRow(item){
-  const rid=rowIdFromSymbol(item.symbol);
-  const row=document.createElement('div'); row.className='row'; row.id=rid;
-
-  const left=document.createElement('div'); left.className='card';
-  left.innerHTML=`<h2>${item.name} — Price & Chart</h2><div id="${cid(rid,'tv')}" style="height:400px"></div>`;
-  row.appendChild(left);
-
-  const mid=document.createElement('div'); mid.className='card';
-  mid.innerHTML=`<h2>Google Trends — “${item.trendTerm}” (1m, Worldwide)</h2><div id="${cid(rid,'trends')}" style="height:360px"></div>`;
-  row.appendChild(mid);
-
-  const right=document.createElement('div'); right.className='card';
-  const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
-  remove.addEventListener('click',()=>removeStock(item.symbol));
-  right.appendChild(remove);
-  right.innerHTML+=`
-    <h2>Pre-Breakout Radar</h2>
-    <div class="kv"><span class="lab">Score</span><span class="score" id="${cid(rid,'score')}">—</span></div>
-    <div class="kv"><span class="lab">Squeeze</span><span id="${cid(rid,'sq-tags')}"></span></div>
-    <div class="kv"><span class="lab">Accumulation</span><span id="${cid(rid,'ac-tags')}"></span></div>
-    <div class="kv"><span class="lab">Leadership</span><span id="${cid(rid,'ld-tags')}"></span></div>
-    <div class="kv"><span class="lab">Location</span><span id="${cid(rid,'lo-tags')}"></span></div>
-    <div id="${cid(rid,'spark')}" class="spark"></div>
-    <div class="sep"></div>
-    <div class="news" id="${cid(rid,'news')}"></div>
-  `;
-  row.appendChild(right);
-
-  grid.appendChild(row);
-
-  renderTradingView(document.getElementById(cid(rid,'tv')), item.symbol);
-  renderTrends(document.getElementById(cid(rid,'trends')), item.trendTerm);
-  fillRowData(item);
-}
-
-function renderSparkAndTags(rid, rows, brow, scoreDetail, score){
-  renderSparkline(document.getElementById(cid(rid,'spark')), rows.slice(-30).map(r=>r.close));
-  const sEl=document.getElementById(cid(rid,'score'));
-  if(sEl){
-    let cls='bad', badge='C';
-    if(score>=70){ cls='good'; badge='A'; }
-    else if(score>=55){ cls='mid'; badge='B'; }
-    sEl.className='score '+cls; sEl.textContent=score.toFixed(0);
-    sEl.insertAdjacentHTML('beforeend',` <span class="badge">${badge}</span>`);
-  }
-  const d=scoreDetail||{};
-  const sq=document.getElementById(cid(rid,'sq-tags'));
-  if(sq) sq.innerHTML=[ tag(d?.SQUEEZE?.atrLow,'ATR% low'), tag(d?.SQUEEZE?.bbLow,'BB width low'), tag(d?.SQUEEZE?.nrx,'NR7/NR4 cluster') ].join(' ');
-  const ac=document.getElementById(cid(rid,'ac-tags'));
-  if(ac) ac.innerHTML=[ tag(d?.ACCUM?.udOK,'Up/Down≥1.2 (flat)',true), tag(d?.ACCUM?.obvUp,'OBV↑'), tag(d?.ACCUM?.pivot,'Pocket Pivot') ].join(' ');
-  const ld=document.getElementById(cid(rid,'ld-tags'));
-  if(ld) ld.innerHTML=[ tag(d?.LEAD?.rsUp,'RS slope↑'), tag(d?.LEAD?.rsTop,'RS top 25%') ].join(' ');
-  const lo=document.getElementById(cid(rid,'lo-tags'));
-  if(lo) lo.innerHTML=[ tag(d?.LOC?.nearHigh,'2–8% under 30-high'), tag(d?.LOC?.ma50OK,'50-DMA rising & above') ].join(' ');
-}
-
-async function fillRowData(item){
-  const rid=rowIdFromSymbol(item.symbol);
-  try{
-    const [rows,brow]=await Promise.all([
-      fetchYahooChart(yTicker(item.symbol),Y_RANGE,Y_INTERVAL),
-      getBenchmarkRows()
-    ]);
-    const pb=computePreBreakout(rows,brow);
-    renderSparkAndTags(rid, rows, brow, pb.detail, pb.score);
-    const row=document.getElementById(rid); if(row) row.dataset.score=String(pb.score||0);
-  }catch(e){
-    console.error('calc error', item.symbol, e);
-    const row=document.getElementById(rid); if(row) row.dataset.score='0';
-  }
-
-  // News (non-blocking)
-  try{
-    const q=`${yTicker(item.symbol)} stock OR ${item.name.replace(/\(.*?\)/g,'').trim()} stock`;
-    const items=await fetchNewsItems(q);
-    const nEl=document.getElementById(cid(rid,'news'));
-    if(nEl){
-      if(!items?.length) nEl.innerHTML=`<h3>Latest News</h3><div style="color:var(--muted)">—</div>`;
-      else nEl.innerHTML=`<h3>Latest News</h3><ul>${
-        items.map(it=>`<li><a target="_blank" rel="noopener noreferrer" href="${it.link}">${it.title}</a>${
-          it.source?` <span style="color:var(--muted);font-size:11px">(${it.source})</span>`:''}${
-          it.pub?` <time>· ${relTime(it.pub)}</time>`:''}</li>`).join('')
-      }</ul>`;
+    function renderTrends(container, keyword){
+      try{
+        if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
+          trends.embed.renderExploreWidgetTo(
+            container,
+            'TIMESERIES',
+            { comparisonItem:[{ keyword, geo:TRENDS_GEO, time:TRENDS_TIME }], category:0, property:'' },
+            { exploreQuery:`q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath:'https://trends.google.com:443/trends/embed/' }
+          ); return;
+        }
+        const src = `https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
+        const iframe=document.createElement('iframe');
+        iframe.src=src; iframe.width='100%'; iframe.height='100%'; iframe.frameBorder='0';
+        container.appendChild(iframe);
+      }catch(e){
+        const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends embed error: '+e.message; container.appendChild(err);
+      }
     }
-  }catch(e){ console.error('news error', item.symbol, e); }
 
-  sortRowsLive(); updateTimestamp();
-}
+    /* =============================
+       RESILIENT CORS PROXIES (Yahoo + RSS)
+       ============================= */
+    async function getRaw(url) {
+      const candidates = [
+        'https://cors.isomorphic-git.org/' + url,
+        'https://corsproxy.io/?' + encodeURIComponent(url),
+        'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+      ];
+      const addBuster = u => u + (u.includes('?') ? '&' : '?') + 'noCache=' + Date.now();
+      let lastErr;
+      for (const prox of candidates) {
+        try {
+          const r = await fetch(addBuster(prox));
+          if (!r.ok) throw new Error('proxy status ' + r.status);
+          return await r.text();
+        } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error('all proxies failed');
+    }
+    async function getJSON(url) {
+      const txt = await getRaw(url);
+      try { return JSON.parse(txt); }
+      catch (e) { throw new Error('bad JSON: ' + txt.slice(0,120)); }
+    }
+    async function yahooChart(ticker, range='1y', interval='1d'){
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=${interval}&includePrePost=false&events=div%7Csplit`;
+      return getJSON(url);
+    }
+    async function yahooEarnings(ticker){
+      const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
+      return getJSON(url);
+    }
 
-function sortRowsLive(){
-  const sel=document.getElementById('sortby').value;
-  const rows=[...grid.children];
-  if(sel==='name'){ rows.sort((a,b)=> a.id.localeCompare(b.id)); }
-  else{ rows.sort((a,b)=> (parseFloat(b.dataset.score||'0') - parseFloat(a.dataset.score||'0'))); }
-  rows.forEach(r=>grid.appendChild(r));
-}
+    /* =============================
+       MINI SPARKLINE
+       ============================= */
+    function drawSparkline(el, series){
+      const W = el.clientWidth || 240, H = 44, P = 2;
+      if (!series?.length){ el.innerHTML=''; return; }
+      const n = series.length, min = Math.min(...series), max = Math.max(...series);
+      const x = i => P + (W-2*P) * (i/(n-1 || 1));
+      const y = v => (max===min) ? H/2 : (H - P - (H-2*P) * ((v - min) / (max - min)));
+      let d = ''; series.forEach((v,i)=>{ d += (i? 'L':'M') + x(i) + ',' + y(v); });
+      const fill = `${d} L ${x(n-1)},${H-P} L ${x(0)},${H-P} Z`;
+      el.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <path class="fill" d="${fill}"></path>
+          <path class="line" d="${d}"></path>
+          <line class="axis" x1="0" y1="${H-P}" x2="${W}" y2="${H-P}"></line>
+        </svg>`;
+    }
 
-function updateTimestamp(){
-  const el=document.getElementById('last-updated'); if(!el) return;
-  el.textContent='Last updated: '+new Date().toLocaleTimeString(); el.style.color='var(--good)'; setTimeout(()=>el.style.color='var(--muted)',1200);
-}
-function renderAll(){ grid.innerHTML=''; benchCache=null; getWatchlist().forEach(it=>buildRow(it)); sortRowsLive(); updateTimestamp(); }
+    /* =============================
+       METRICS + STRENGTH
+       ============================= */
+    function sma(arr,n){ const seg=arr.slice(-n); return seg.reduce((a,b)=>a+b,0)/Math.max(1,seg.length); }
+    function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+    function computeStrength(parts){
+      const volNorm = clamp(parts.volVsAvg / SCORE_CAPS.volVsAvg, 0, 1);
+      const rsNorm  = clamp(parts.rs       / SCORE_CAPS.rs,       0, 1);
+      const near    = Math.max(0, -parts.nearHigh); // distance below high
+      const nhNorm  = clamp(1 - (near / SCORE_CAPS.nearHigh), 0, 1);
+      const maNorm  = (parts.above50 ? 0.5 : 0) + (parts.above200 ? 0.5 : 0);
+      const score01 =
+        volNorm * SCORE_WEIGHTS.volVsAvg +
+        rsNorm  * SCORE_WEIGHTS.rs +
+        nhNorm  * SCORE_WEIGHTS.nearHigh +
+        maNorm  * SCORE_WEIGHTS.maStack;
+      return Math.round(score01 * 100);
+    }
 
-function addOrUpdate(){
-  const s=document.getElementById('in-symbol').value.trim();
-  const n=document.getElementById('in-name').value.trim()||s;
-  const t=document.getElementById('in-trend').value.trim()||n;
-  if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
-  const key=yTicker(s); const list=getWatchlist(); const i=list.findIndex(x=>yTicker(x.symbol)===key);
-  if(i===-1) list.push({symbol:s,name:n,trendTerm:t}); else list[i]={symbol:s,name:n,trendTerm:t};
-  setWatchlist(list);
-  document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
-  renderAll();
-}
-function removeStock(symbol){ const key=yTicker(symbol); const list=getWatchlist().filter(x=>yTicker(x.symbol)!==key); setWatchlist(list); renderAll(); }
-function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
+    async function fetchBenchmarkCloses(){
+      const b = await yahooChart(BENCHMARK, '6mo', '1d');
+      return (b?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || []).filter(v=>v!=null);
+    }
 
-document.getElementById('btn-add').addEventListener('click', addOrUpdate);
-document.getElementById('btn-reset').addEventListener('click', resetDefaults);
-document.getElementById('btn-refresh').addEventListener('click', renderAll);
-document.getElementById('sortby').addEventListener('change', sortRowsLive);
+    async function computeMetricsFor(symbol, benchCloses){
+      const t = yTicker(symbol);
+      const ch = await yahooChart(t, '1y', '1d');
+      const c = ch?.chart?.result?.[0];
+      const q = c?.indicators?.quote?.[0];
+      const closes  = (q?.close  || []).filter(v=>v!=null);
+      const volumes = (q?.volume || []).filter(v=>v!=null);
+      if (!closes.length || !volumes.length) throw new Error('no data for '+t);
 
-renderAll();
-setInterval(renderAll, AUTO_REFRESH_MS);
-</script>
+      const price = closes[closes.length-1];
+
+      // Volume vs 20d avg
+      const recentVol = volumes[volumes.length-1];
+      const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0)/Math.max(1, Math.min(AVG_VOL_WINDOW, volumes.length));
+      const volVsAvg = recentVol / (avgVol || 1);
+
+      // RS vs benchmark
+      const bc = benchCloses;
+      const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
+      const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
+      const rs = (price/p0) / ((bc[bc.length-1]||p0)/(b0||bc[0]||1)) - 1;
+
+      // Price vs 30d high
+      const windowCloses = closes.slice(-HIGH_LOOKBACK);
+      const high = Math.max(...windowCloses);
+      const nearHigh = price/high - 1;
+
+      // MAs
+      const ma50  = sma(closes, MA50_WINDOW);
+      const ma200 = sma(closes, MA200_WINDOW);
+      const above50 = price > ma50, above200 = price > ma200;
+
+      const strength = computeStrength({ volVsAvg, rs, nearHigh, above50, above200 });
+
+      return { ticker:t, closes, volumes, price, volVsAvg, rs, nearHigh, above50, above200, strength };
+    }
+
+    /* =============================
+       NEWS (Google News RSS)
+       ============================= */
+    function cleanNameForQuery(name){ return String(name || '').replace(/\(.*?\)/g,'').trim(); }
+    function relTime(d){
+      const t = new Date(d).getTime(); if(!isFinite(t)) return '';
+      const mins = Math.max(1, Math.round((Date.now() - t)/60000));
+      if (mins < 60) return `${mins}m`; const hrs = Math.round(mins/60);
+      if (hrs < 24) return `${hrs}h`; return `${Math.round(hrs/24)}d`;
+    }
+    async function fetchNewsItems(query){
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+      const xmlText = await getRaw(url);
+      const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+      const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
+        const title = node.getElementsByTagName('title')[0]?.textContent || '';
+               const link = node.getElementsByTagName('link')[0]?.textContent || '#';
+        const pub  = node.getElementsByTagName('pubDate')[0]?.textContent || '';
+        const source = node.getElementsByTagName('source')[0]?.textContent || '';
+        return { title, link, pub, source };
+      });
+      return items;
+    }
+    function renderNewsList(container, items){
+      if(!container) return;
+      if(!items?.length){
+        container.innerHTML = `<div class="news"><h3>Latest News</h3><div style="color:var(--muted)">—</div></div>`;
+        return;
+      }
+      container.innerHTML = `
+        <div class="news">
+          <h3>Latest News</h3>
+          <ul>
+            ${items.map(it => `
+              <li>
+                <a href="${it.link}" target="_blank" rel="noopener noreferrer">${it.title}</a>
+                ${it.source ? ` <span style="color:var(--muted);font-size:11px">(${it.source})</span>` : ''}
+                ${it.pub ? `<time>· ${relTime(it.pub)}</time>` : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </div>`;
+    }
+    async function populateNewsByMount(mount, item){
+      const tkr = yTicker(item.symbol);
+      const name = cleanNameForQuery(item.name);
+      const query = `${tkr} stock OR ${name} stock`;
+      try{
+        const items = await fetchNewsItems(query);
+        renderNewsList(mount, items);
+      }catch(e){
+        renderNewsList(mount, []);
+        console.error('News error', item, e);
+      }
+    }
+
+    /* =============================
+       BUILD (STABLE IDS + SORTING)
+       ============================= */
+    function buildRow(item, _idx, metrics){
+      const rid = rowIdFromSymbol(item.symbol);
+
+      // LEFT — TradingView
+      const left=document.createElement('div'); left.className='card';
+      const hL=document.createElement('h2'); hL.textContent=`${item.name} — Price & Chart`;
+      const cL=document.createElement('div'); cL.className='chart';
+      left.appendChild(hL); left.appendChild(cL);
+
+      // MIDDLE — Trends
+      const mid=document.createElement('div'); mid.className='card';
+      const hM=document.createElement('h2'); hM.textContent=`Google Trends — “${item.trendTerm}” (1 month, Worldwide)`;
+      const cM=document.createElement('div'); cM.className='trend'; cM.id=`trend-${rid}`;
+      mid.appendChild(hM); mid.appendChild(cM);
+
+      // RIGHT — Radar + News
+      const right=document.createElement('div'); right.className='card';
+      const strength=document.createElement('div'); strength.className='strength-badge';
+      strength.innerHTML = `Strength: <strong>${metrics.strength}</strong>`;
+      const hR=document.createElement('h2'); hR.textContent='Breakout Radar';
+      const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
+      remove.addEventListener('click',()=> removeStockBySymbol(item.symbol));
+
+      const tbl=document.createElement('table');
+      tbl.innerHTML = `
+        <thead><tr><th>Metric</th><th class="val">Value</th><th class="sig">Signal</th></tr></thead>
+        <tbody>
+          <tr><td>Volume vs 20d Avg</td><td id="${cellId(rid,'vavg')}"   class="val">—</td><td id="${cellId(rid,'vavg-s')}"   class="sig">—</td></tr>
+          <tr><td>RS vs ${BENCHMARK} (${RS_LOOKBACK}d)</td><td id="${cellId(rid,'rs')}"     class="val">—</td><td id="${cellId(rid,'rs-s')}"     class="sig">—</td></tr>
+          <tr><td>Price vs 30d High</td><td id="${cellId(rid,'phigh')}"  class="val">—</td><td id="${cellId(rid,'phigh-s')}"  class="sig">—</td></tr>
+          <tr><td>Above 50d / 200d MA</td><td id="${cellId(rid,'ma')}"   class="val">—</td><td id="${cellId(rid,'ma-s')}"     class="sig">—</td></tr>
+          <tr><td>Next Earnings</td><td id="${cellId(rid,'earn')}"  class="val">—</td><td class="sig">—</td></tr>
+          <tr><td>Trend (30 bars)</td><td colspan="2"><div id="${cellId(rid,'spark')}" class="spark"></div></td></tr>
+        </tbody>`;
+
+      right.appendChild(strength); right.appendChild(hR); right.appendChild(remove); right.appendChild(tbl);
+
+      const newsBox = document.createElement('div');
+      newsBox.id = `${cellId(rid,'news')}`;
+      newsBox.className = 'news';
+      right.appendChild(newsBox);
+
+      grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
+
+      // Embeds
+      renderTradingView(cL, item.symbol);
+      renderTrends(cM, item.trendTerm);
+
+      // Sparkline + metrics paint
+      drawSparkline(document.getElementById(cellId(rid,'spark')), metrics.closes.slice(-30));
+
+      const setSigPaint = (valId, sigId, passed, text) => {
+        const v = document.getElementById(valId), s = document.getElementById(sigId);
+        v.textContent = text; s.textContent = passed ? '✅':'—';
+        s.className = 'sig ' + (passed ? 'ok':'ko'); v.className = 'val ' + (passed ? 'ok':'ko');
+      };
+
+      setSigPaint(cellId(rid,'vavg'),  cellId(rid,'vavg-s'),  metrics.volVsAvg >= THRESHOLDS.volVsAvg,    metrics.volVsAvg.toFixed(2)+'x');
+      setSigPaint(cellId(rid,'rs'),    cellId(rid,'rs-s'),    metrics.rs      >= THRESHOLDS.rsOutperformance, (metrics.rs*100).toFixed(1)+'%');
+      setSigPaint(cellId(rid,'phigh'), cellId(rid,'phigh-s'), metrics.nearHigh>= THRESHOLDS.nearHighPct, (metrics.nearHigh*100).toFixed(1)+'%');
+
+      const mCell = document.getElementById(cellId(rid,'ma'));
+      const mSig  = document.getElementById(cellId(rid,'ma-s'));
+      mCell.textContent = `${metrics.above50?'Above':'Below'} 50d / ${metrics.above200?'Above':'Below'} 200d`;
+      mSig.textContent = (metrics.above50 && metrics.above200) ? '✅' : '—';
+      mSig.className = 'sig ' + ((metrics.above50 && metrics.above200) ? 'ok':'ko');
+
+      // Earnings async
+      (async ()=>{
+        try{
+          const ej = await yahooEarnings(metrics.ticker);
+          const raw = ej?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
+          document.getElementById(cellId(rid,'earn')).textContent = raw ? new Date(raw*1000).toISOString().slice(0,10) : '—';
+        }catch{ document.getElementById(cellId(rid,'earn')).textContent = '—'; }
+      })();
+
+      // News
+      populateNewsByMount(document.getElementById(cellId(rid,'news')), item);
+    }
+
+    async function buildSortedMetrics(list){
+      const benchCloses = await fetchBenchmarkCloses();
+      const results = [];
+      for (const it of list){
+        try{
+          const m = await computeMetricsFor(it.symbol, benchCloses);
+          results.push({ item: it, metrics: m });
+        }catch(e){
+          console.error('metrics error', it, e);
+          results.push({ item: it, metrics: { strength: 0, closes: [], price: 0, volVsAvg:0, rs:0, nearHigh:-1, above50:false, above200:false, ticker:yTicker(it.symbol) } });
+        }
+      }
+      results.sort((a,b)=> b.metrics.strength - a.metrics.strength);
+      return results;
+    }
+
+    async function renderAllSorted(){
+      grid.innerHTML='';
+      const list = getWatchlist();
+      const results = await buildSortedMetrics(list);
+      results.forEach((res, i) => buildRow(res.item, i, res.metrics));
+      updateTimestamp();
+    }
+
+    /* =============================
+       ADD / REMOVE (by symbol, deduped)
+       ============================= */
+    function addStock(){
+      const s = document.getElementById('in-symbol').value.trim();
+      const n = document.getElementById('in-name').value.trim() || s;
+      const t = document.getElementById('in-trend').value.trim() || n;
+      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
+      const list = getWatchlist();
+      const key = yTicker(s);
+      const idx = list.findIndex(x => yTicker(x.symbol) === key);
+      if(idx === -1) list.push({ symbol:s, name:n, trendTerm:t });
+      else           list[idx] = { symbol:s, name:n, trendTerm:t }; // update
+      setWatchlist(list);
+      renderAllSorted();
+      document.getElementById('in-symbol').value='';
+      document.getElementById('in-name').value='';
+      document.getElementById('in-trend').value='';
+    }
+
+    function removeStockBySymbol(symbol){
+      const key = yTicker(symbol);
+      const list = getWatchlist().filter(x => yTicker(x.symbol) !== key);
+      setWatchlist(list);
+      renderAllSorted();
+    }
+
+    function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAllSorted(); }
+
+    function updateTimestamp(){
+      const ts = new Date().toLocaleTimeString();
+      const el = document.getElementById('last-updated');
+      if (!el) return;
+      el.textContent = `Last updated: ${ts}`;
+      el.style.color = 'var(--good)';
+      setTimeout(()=>{ el.style.color='var(--muted)'; }, 1500);
+    }
+
+    function refreshNow(){ renderAllSorted(); }
+
+    document.getElementById('btn-add').addEventListener('click', addStock);
+    document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+    document.getElementById('btn-refresh').addEventListener('click', refreshNow);
+
+    // Initial render
+    renderAllSorted();
+
+    // Auto-refresh radar + resort every 5 minutes
+    setInterval(renderAllSorted, REFRESH_MS);
+
+    // Auto-refresh news every 15 minutes
+    setInterval(async () => {
+      const list = getWatchlist();
+      // refresh only news mounts that exist
+      list.forEach((it) => {
+        const rid = rowIdFromSymbol(it.symbol);
+        const mount = document.getElementById(cellId(rid,'news'));
+        if (mount) populateNewsByMount(mount, it);
+      });
+    }, NEWS_REFRESH_MS);
+  </script>
 </body>
 </html>
-
