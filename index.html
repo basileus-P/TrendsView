@@ -1,565 +1,533 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>INDEX — Stocks + Trends + Breakout Radar</title>
-  <style>
-    :root {
-      --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8;
-      --good:#19c37d; --bad:#d66; --warn:#d6a019; --accent:#8fb6ff; --chip:#0e1522;
-    }
-    html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Potential Breakthrough + Intrinsic Valuation</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8;
+    --good:#19c37d; --bad:#d66; --warn:#d6a019; --accent:#8fb6ff; --chip:#0e1522;
+  }
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 
-    /* Project Tabs (so INDEX is its own window) */
-    .tabs{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);background:#0a1018;position:sticky;top:0;z-index:5}
-    .tab{padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:#0f1826;color:var(--muted);text-decoration:none;cursor:pointer}
-    .tab.active{background:#172335;color:#fff;border-color:#223146}
-    .tab.disabled{opacity:.55;cursor:not-allowed}
+  .tabs{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);background:#0a1018;position:sticky;top:0;z-index:5}
+  .tab{padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:#0f1826;color:var(--muted);text-decoration:none;cursor:pointer}
+  .tab.active{background:#172335;color:#fff;border-color:#223146}
 
-    header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
-    h1{margin:0;font-size:18px}
-    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .toolbar input{background:#0e1522;border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text)}
-    .toolbar button{background:#152235;border:1px solid var(--border);color:#e6eef7;padding:8px 12px;border-radius:10px;cursor:pointer}
-    .toolbar button:hover{filter:brightness(1.1)}
-    #last-updated{color:var(--muted);font-size:12px}
+  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+  h1{margin:0;font-size:18px}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .toolbar input{background:#0e1522;border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text)}
+  .toolbar button{background:#152235;border:1px solid var(--border);color:#e6eef7;padding:8px 12px;border-radius:10px;cursor:pointer}
+  .toolbar button:hover{filter:brightness(1.1)}
+  #last-updated{color:var(--muted);font-size:12px}
 
-    .container{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:16px;align-items:start}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative}
-    .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.2px;padding-right:36px}
-    .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
-    .remove-btn:hover{filter:brightness(1.1)}
-    .strength-badge{position:absolute;top:10px;left:10px;background:var(--chip);border:1px solid var(--border);padding:4px 8px;border-radius:8px;font-size:12px;color:var(--muted)}
-    .strength-badge strong{color:#fff}
+  .container{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:16px;align-items:start}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;position:relative}
+  .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.2px;padding-right:36px}
+  .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
+  .remove-btn:hover{filter:brightness(1.1)}
 
-    .chart{height:400px}
-    .trend{height:360px}
+  .chart{height:400px}
+  .trend{height:360px}
 
-    table{width:100%;border-collapse:collapse;color:var(--text)}
-    th,td{border-color:var(--border);padding:6px 4px}
-    th{border-bottom:1px solid var(--border);text-align:left}
-    td.val{text-align:right}
-    td.sig{text-align:center;width:60px}
-    .ok{color:var(--good);font-weight:600}
-    .ko{color:var(--muted)}
-    .warn{color:var(--warn)}
+  .badge{position:absolute;top:10px;left:10px;background:var(--chip);border:1px solid var(--border);padding:4px 8px;border-radius:8px;font-size:12px;color:var(--muted)}
+  .badge strong{color:#fff}
 
-    .spark{height:44px}
-    .spark svg{width:100%;height:44px;display:block}
-    .spark .line{fill:none;stroke:var(--accent);stroke-width:2}
-    .spark .fill{fill:rgba(143,182,255,0.12);stroke:none}
-    .spark .axis{stroke:#233046;stroke-width:1}
+  .subcard{background:transparent;border-top:1px dashed var(--border);margin-top:8px;padding-top:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  table{width:100%;border-collapse:collapse;color:var(--text)}
+  th,td{border-color:var(--border);padding:6px 4px}
+  th{border-bottom:1px solid var(--border);text-align:left}
+  td.val{text-align:right}
+  td.sig{text-align:center;width:60px}
+  .ok{color:var(--good);font-weight:600}
+  .ko{color:var(--muted)}
+  .warn{color:var(--warn)}
 
-    .news{margin-top:10px}
-    .news h3{margin:8px 0 4px;font-size:12px;color:var(--muted)}
-    .news ul{list-style:none;padding:0;margin:0}
-    .news li{margin:6px 0}
-    .news a{color:var(--accent);text-decoration:none}
-    .news a:hover{text-decoration:underline}
-    .news time{color:var(--muted);font-size:11px;margin-left:6px}
+  .spark{height:44px}
+  .spark svg{width:100%;height:44px;display:block}
+  .spark .line{fill:none;stroke:var(--accent);stroke-width:2}
+  .spark .fill{fill:rgba(143,182,255,0.12);stroke:none}
+  .spark .axis{stroke:#233046;stroke-width:1}
 
-    @media (max-width:980px){
-      .container{grid-template-columns:1fr}
-      .chart,.trend{height:300px}
-    }
-  </style>
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+  .chip{border:1px solid var(--border);background:#0e1522;border-radius:999px;padding:2px 8px;font-size:11px;color:var(--muted)}
+  .chip.ok{color:#9ef3c4;border-color:#2a604d;background:#0f2b22}
+  .chip.warn{color:#ffd37a;border-color:#6c561d;background:#2a230d}
+
+  .news{margin-top:10px}
+  .news h3{margin:8px 0 4px;font-size:12px;color:var(--muted)}
+  .news ul{list-style:none;padding:0;margin:0}
+  .news li{margin:6px 0}
+  .news a{color:var(--accent);text-decoration:none}
+  .news a:hover{text-decoration:underline}
+  .news time{color:var(--muted);font-size:11px;margin-left:6px}
+
+  @media (max-width:980px){
+    .container{grid-template-columns:1fr}
+    .chart,.trend{height:300px}
+  }
+</style>
 </head>
 <body>
-  <!-- Project Tabs (INDEX = current project window) -->
-  <nav class="tabs">
-    <span class="tab active" title="This dashboard">INDEX</span>
-    <span class="tab disabled" title="Reserved for future modules">SCREENERS</span>
-    <span class="tab disabled" title="Reserved for settings">SETTINGS</span>
-  </nav>
+<nav class="tabs">
+  <span class="tab" onclick="location.href='index.html'">INDEX (Hotness)</span>
+  <span class="tab active">Breakthrough + Valuation</span>
+</nav>
 
-  <header>
-    <h1>Stocks (left) • Google Trends (middle) • Breakout Radar (right)</h1>
-    <div class="toolbar">
-      <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26" />
-      <input id="in-name" placeholder="Display name" size="18" />
-      <input id="in-trend" placeholder="Google Trends term" size="18" />
-      <button id="btn-add">Add / Update</button>
-      <button id="btn-reset">Reset defaults</button>
-      <button id="btn-refresh">Refresh Now</button>
-      <span id="last-updated"></span>
-    </div>
-  </header>
+<header>
+  <h1>Left: Price • Middle: Google Trends (1m) • Right: Pre-Breakout + Valuation + News</h1>
+  <div class="toolbar">
+    <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26" />
+    <input id="in-name" placeholder="Display name" size="18" />
+    <input id="in-trend" placeholder="Google Trends term" size="18" />
+    <button id="btn-add">Add / Update</button>
+    <button id="btn-reset">Reset defaults</button>
+    <button id="btn-refresh">Refresh Now</button>
+    <span id="last-updated"></span>
+  </div>
+</header>
 
-  <div id="grid" class="container"></div>
+<div id="grid" class="container"></div>
 
-  <!-- Google Trends embed loader -->
-  <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
-  <script>
-    /* =============================
-       CONFIG
-       ============================= */
-    const DEFAULT_WATCHLIST = [
-      { symbol: "NASDAQ:MVIS", name: "MicroVision (MVIS)", trendTerm: "MicroVision" },
-      { symbol: "NASDAQ:QSI",  name: "Quantum-Si (QSI)",   trendTerm: "Quantum-Si" },
-      { symbol: "NASDAQ:REKR", name: "Rekor Systems (REKR)", trendTerm: "Rekor Systems" }
-    ];
-    const STORAGE_KEY = 'WATCHLIST_V3'; // baseline you liked
+<script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
+<script>
+/* ========= Config (same spirit as your main page) ========= */
+const DEFAULT_WATCHLIST = [
+  { symbol: "NASDAQ:MVIS", name: "MicroVision (MVIS)", trendTerm: "MicroVision" },
+  { symbol: "NASDAQ:QSI",  name: "Quantum-Si (QSI)",   trendTerm: "Quantum-Si" },
+  { symbol: "NASDAQ:REKR", name: "Rekor Systems (REKR)", trendTerm: "Rekor Systems" }
+];
+const STORAGE_KEY = 'WATCHLIST_BREAKTHROUGH_V1';
 
-    // Trends embed settings
-    const TRENDS_GEO  = "";            // Worldwide
-    const TRENDS_TIME = "today 1-m";   // last 1 month
+const TRENDS_GEO  = "";
+const TRENDS_TIME = "today 1-m";
 
-    // Breakout metric params
-    const BENCHMARK = "QQQ";   // RS vs this ETF
-    const RS_LOOKBACK = 10;
-    const AVG_VOL_WINDOW = 20;
-    const HIGH_LOOKBACK = 30;
-    const MA50_WINDOW = 50;
-    const MA200_WINDOW = 200;
+const BENCHMARK = "QQQ";
 
-    // thresholds
-    const THRESHOLDS = {
-      volVsAvg: 1.5,
-      nearHighPct: -0.10,
-      rsOutperformance: 0.01
-    };
+/* Pre-Breakout params */
+const RS_LOOKBACK = 20;        // leadership horizon
+const VOL_WIN = 20;            // average volume window
+const BB_WIN = 20;             // squeeze BB length
+const NR_LOOK = 10;            // lookback for NR cluster
+const NEAR_HIGH_LOOK = 30;     // distance from high
+const MA50 = 50, MA200 = 200;
 
-    // Strength weights
-    const SCORE_WEIGHTS = { volVsAvg: 0.35, rs: 0.25, nearHigh: 0.25, maStack: 0.15 };
-    const SCORE_CAPS    = { volVsAvg: 3.0,  rs: 0.05,  nearHigh: 0.10 };
+/* Thresholds */
+const TH = {
+  ignitionVol: 1.5,   // >1.5x 20d
+  ignitionRet: 0.02,  // >+2%
+  nearHigh: -0.10,    // within 10% of 30d high
+};
 
-    // Auto-refresh
-    const REFRESH_MS = 5 * 60 * 1000;       // radar
-    const NEWS_REFRESH_MS = 15 * 60 * 1000; // news
+/* Valuation weights (fixed here; tunable later if you want sliders) */
+const VW = {
+  ps: 0.25, fcf: 0.20, growth: 0.25, gm: 0.10, sbc: 0.05, dilution: 0.05, leverage: 0.05, trend: 0.05
+};
 
-    /* =============================
-       STABLE IDS / KEYS
-       ============================= */
-    function yTicker(sym){ return String(sym || '').split(':').pop().trim().toUpperCase(); }
-    function rowIdFromSymbol(symbol){ return 'row-' + yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
-    function cellId(rowId, key){ return `${key}-${rowId}`; }
+/* ========= Helpers ========= */
+function yTicker(sym){ return String(sym||'').split(':').pop().trim().toUpperCase(); }
+function rowIdFromSymbol(symbol){ return 'row-' + yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
+function cellId(rid,key){ return `${key}-${rid}`; }
 
-    /* =============================
-       STORAGE
-       ============================= */
-    function getWatchlist(){
+function sma(a,n){ const w=a.slice(-n); return w.reduce((x,y)=>x+y,0)/Math.max(1,w.length); }
+function stdev(a,n){
+  const w=a.slice(-n); const m=sma(w,w.length||1);
+  const v=sma(w.map(x=>(x-m)*(x-m)),w.length||1);
+  return Math.sqrt(v||0);
+}
+function relTime(d){
+  const t = new Date(d).getTime(); if(!isFinite(t)) return '';
+  const mins = Math.max(1, Math.round((Date.now()-t)/60000));
+  if(mins<60) return mins+'m'; const h=Math.round(mins/60); if(h<24) return h+'h'; return Math.round(h/24)+'d';
+}
+
+/* ========= Gentle fetch with tiny concurrency (prevents 429 storms) ========= */
+const MAX_CONCURRENCY=2; let inflight=0; const q=[];
+function withLimit(fn){ return new Promise((res,rej)=>{ const go=async()=>{ inflight++; try{ res(await fn()); }catch(e){ rej(e); } finally{ inflight--; const n=q.shift(); if(n) n(); } }; if(inflight>=MAX_CONCURRENCY) q.push(go); else go(); }); }
+async function getRaw(url){
+  const proxies=[
+    'https://cors.isomorphic-git.org/'+url,
+    'https://corsproxy.io/?'+encodeURIComponent(url),
+    'https://api.allorigins.win/raw?url='+encodeURIComponent(url)
+  ];
+  const bust=u=>u+(u.includes('?')?'&':'?')+'nc='+(Date.now()+Math.floor(Math.random()*999));
+  let last;
+  for(const p of proxies){
+    for(let attempt=1;attempt<=2;attempt++){
       try{
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw) return DEFAULT_WATCHLIST.slice();
-        const arr = JSON.parse(raw);
-        if(!Array.isArray(arr) || !arr.length) return DEFAULT_WATCHLIST.slice();
-        return arr;
-      }catch{ return DEFAULT_WATCHLIST.slice(); }
+        return await withLimit(async ()=>{
+          const r=await fetch(bust(p));
+          if(!r.ok){ if(r.status===429||r.status>=500) throw new Error('retry '+r.status); throw new Error('status '+r.status); }
+          return r.text();
+        });
+      }catch(e){ last=e; await new Promise(r=>setTimeout(r, 150*attempt+Math.random()*250)); }
     }
-    function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
+  }
+  throw last||new Error('all proxies failed');
+}
+async function getJSON(url){ const t=await getRaw(url); try{ return JSON.parse(t); }catch{ throw new Error('bad JSON'); } }
 
-    /* =============================
-       UI HELPERS (embeds)
-       ============================= */
-    const grid = document.getElementById('grid');
+/* ========= Data sources ========= */
+async function yahooChart(tkr, range='1y', interval='1d'){
+  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(tkr)}?range=${range}&interval=${interval}&includePrePost=false&events=div%7Csplit`;
+  return getJSON(url);
+}
+async function yahooFundamentals(tkr){
+  const url=`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(tkr)}?modules=price,financialData,defaultKeyStatistics,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory`;
+  return getJSON(url);
+}
+async function fetchNews(query){
+  const url=`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+  const xml=await getRaw(url);
+  const doc=new DOMParser().parseFromString(xml,'text/xml');
+  return [...doc.getElementsByTagName('item')].slice(0,3).map(n=>{
+    const title=n.getElementsByTagName('title')[0]?.textContent||'';
+    const link =n.getElementsByTagName('link')[0]?.textContent||'#';
+    const pub  =n.getElementsByTagName('pubDate')[0]?.textContent||'';
+    const src  =n.getElementsByTagName('source')[0]?.textContent||'';
+    return {title,link,pub,src};
+  });
+}
 
-    function renderTradingView(container, symbol){
-      // clear to avoid double-inject / overlap
-      container.innerHTML = '';
-      const wrap=document.createElement('div');
-      wrap.className='tradingview-widget-container';
-      const widget=document.createElement('div');
-      widget.className='tradingview-widget-container__widget';
-      wrap.appendChild(widget);
-      const s=document.createElement('script');
-      s.type='text/javascript';
-      s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
-      s.async=true;
-      s.innerHTML=JSON.stringify({
-        symbols:[[symbol+"|1D"]],chartOnly:false,width:"100%",height:"100%",locale:"en",autosize:true,dateRange:"12M",showVolume:true,showMA:true,colorTheme:"dark"
-      });
-      wrap.appendChild(s);
-      container.appendChild(wrap);
+/* ========= Embeds ========= */
+function renderTV(container, symbol){
+  container.innerHTML='';
+  const wrap=document.createElement('div'); wrap.className='tradingview-widget-container';
+  const w=document.createElement('div'); w.className='tradingview-widget-container__widget'; wrap.appendChild(w);
+  const s=document.createElement('script'); s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js'; s.async=true;
+  s.innerHTML=JSON.stringify({
+    symbols:[[symbol+'|1D']], chartOnly:false, width:'100%', height:'100%', locale:'en', autosize:true, dateRange:'12M', showVolume:true, showMA:true, colorTheme:'dark'
+  });
+  wrap.appendChild(s); container.appendChild(wrap);
+}
+function renderTrends(container, term){
+  try{
+    if(window.trends && trends.embed?.renderExploreWidgetTo){
+      trends.embed.renderExploreWidgetTo(container,'TIMESERIES',
+        {comparisonItem:[{keyword:term,geo:TRENDS_GEO,time:TRENDS_TIME}],category:0,property:''},
+        {exploreQuery:`q=${encodeURIComponent(term)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath:'https://trends.google.com:443/trends/embed/'}
+      ); return;
     }
+    const i=document.createElement('iframe');
+    i.src=`https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(term)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
+    i.width='100%'; i.height='100%'; i.frameBorder='0'; i.loading='lazy';
+    container.appendChild(i);
+  }catch(e){
+    const d=document.createElement('div'); d.style.color='#f99'; d.textContent='Trends error: '+e.message; container.appendChild(d);
+  }
+}
 
-    function renderTrends(container, keyword){
-      try{
-        if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
-          trends.embed.renderExploreWidgetTo(
-            container,
-            'TIMESERIES',
-            { comparisonItem:[{ keyword, geo:TRENDS_GEO, time:TRENDS_TIME }], category:0, property:'' },
-            { exploreQuery:`q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`, guestPath:'https://trends.google.com:443/trends/embed/' }
-          ); return;
-        }
-        const src = `https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
-        const iframe=document.createElement('iframe');
-        iframe.src=src; iframe.width='100%'; iframe.height='100%'; iframe.frameBorder='0'; iframe.loading='lazy';
-        container.appendChild(iframe);
-      }catch(e){
-        const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends embed error: '+e.message; container.appendChild(err);
-      }
-    }
+/* ========= Pre-Breakout score ========= */
+function nrCluster(highs,lows){
+  const ranges=highs.map((h,i)=>h-(lows[i]??h));
+  let nr4=0, nr7=0;
+  for(let i=3;i<ranges.length;i++){ if(ranges[i]<Math.min(...ranges.slice(i-3,i))) nr4++; }
+  for(let i=6;i<ranges.length;i++){ if(ranges[i]<Math.min(...ranges.slice(i-6,i))) nr7++; }
+  return {nr4, nr7};
+}
+function preBreakoutFromSeries(closes, highs, lows, vols, benchCloses){
+  if(closes.length<MA200) return {score:0, chips:[], parts:{}};
+  const price = closes[closes.length-1];
 
-    /* =============================
-       LIGHT RATE-LIMITING FETCH (keeps your proxies)
-       ============================= */
-    const MAX_CONCURRENCY = 2;
-    let inflight = 0;
-    const waiters = [];
-    function withLimit(fn){
-      return new Promise(async (resolve,reject)=>{
-        const enter = async ()=>{
-          inflight++;
-          try{ resolve(await fn()); }
-          catch(e){ reject(e); }
-          finally{
-            inflight--;
-            const nxt = waiters.shift();
-            if(nxt) nxt();
-          }
-        };
-        if(inflight >= MAX_CONCURRENCY) waiters.push(enter); else enter();
-      });
-    }
+  // squeeze: BB width vs its 6m median
+  const bbStd = stdev(closes, BB_WIN);
+  const bbWidth = (2*bbStd)/(price||1);
+  const histWidth=[];
+  for(let i=BB_WIN;i<=closes.length;i++){
+    const std = stdev(closes.slice(0,i), BB_WIN);
+    const p   = closes[i-1]||price;
+    histWidth.push((2*std)/(p||1));
+  }
+  const med = histWidth.sort((a,b)=>a-b)[Math.floor(histWidth.length/2)] || bbWidth;
+  const squeeze = bbWidth < 0.8 * med;
 
-    async function getRaw(url) {
-      const proxies = [
-        'https://cors.isomorphic-git.org/' + url,
-        'https://corsproxy.io/?' + encodeURIComponent(url),
-        'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
-      ];
-      const bust = u => u + (u.includes('?') ? '&' : '?') + 'nc=' + (Date.now() + Math.floor(Math.random()*1000));
-      let lastErr;
-      for (const p of proxies) {
-        for (let attempt=1; attempt<=2; attempt++){
-          try{
-            const txt = await withLimit(async ()=>{
-              const r = await fetch(bust(p));
-              if(!r.ok){
-                if(r.status===429 || r.status>=500) throw new Error('retry '+r.status);
-                throw new Error('status '+r.status);
-              }
-              return r.text();
-            });
-            return txt;
-          }catch(e){
-            lastErr = e;
-            // small jittered backoff
-            await new Promise(r=>setTimeout(r, 200*attempt + Math.random()*300));
-          }
-        }
-      }
-      throw lastErr || new Error('all proxies failed');
-    }
-    async function getJSON(url) {
-      const txt = await getRaw(url);
-      try { return JSON.parse(txt); }
-      catch (e) { throw new Error('bad JSON: ' + txt.slice(0,120)); }
-    }
-    async function yahooChart(ticker, range='1y', interval='1d'){
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=${interval}&includePrePost=false&events=div%7Csplit`;
-      return getJSON(url);
-    }
-    async function yahooEarnings(ticker){
-      const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
-      return getJSON(url);
-    }
+  // NR4/NR7 cluster last NR_LOOK
+  const {nr4, nr7} = nrCluster(highs.slice(-NR_LOOK), lows.slice(-NR_LOOK));
+  const nrClusterHit = (nr4>=2 || nr7>=1);
 
-    /* =============================
-       MINI SPARKLINE
-       ============================= */
-    function drawSparkline(el, series){
-      const W = el.clientWidth || 240, H = 44, P = 2;
-      if (!series?.length){ el.innerHTML=''; return; }
-      const n = series.length, min = Math.min(...series), max = Math.max(...series);
-      const x = i => P + (W-2*P) * (i/(n-1 || 1));
-      const y = v => (max===min) ? H/2 : (H - P - (H-2*P) * ((v - min) / (max - min)));
-      let d = ''; series.forEach((v,i)=>{ d += (i? 'L':'M') + x(i) + ',' + y(v); });
-      const fill = `${d} L ${x(n-1)},${H-P} L ${x(0)},${H-P} Z`;
-      el.innerHTML = `
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-          <path class="fill" d="${fill}"></path>
-          <path class="line" d="${d}"></path>
-          <line class="axis" x1="0" y1="${H-P}" x2="${W}" y2="${H-P}"></line>
-        </svg>`;
-    }
+  // accumulation: up/down vol last 10d
+  let up=0, down=0;
+  for(let i=Math.max(1,closes.length-10); i<closes.length; i++){
+    if(closes[i]>closes[i-1]) up += vols[i]||0; else down += vols[i]||0;
+  }
+  const acc = up > 1.2*down;
 
-    /* =============================
-       METRICS + STRENGTH
-       ============================= */
-    function sma(arr,n){ const seg=arr.slice(-n); return seg.reduce((a,b)=>a+b,0)/Math.max(1,seg.length); }
-    function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
-    function computeStrength(parts){
-      const volNorm = clamp(parts.volVsAvg / SCORE_CAPS.volVsAvg, 0, 1);
-      const rsNorm  = clamp(parts.rs       / SCORE_CAPS.rs,       0, 1);
-      const near    = Math.max(0, -parts.nearHigh); // distance below high
-      const nhNorm  = clamp(1 - (near / SCORE_CAPS.nearHigh), 0, 1);
-      const maNorm  = (parts.above50 ? 0.5 : 0) + (parts.above200 ? 0.5 : 0);
-      const score01 =
-        volNorm * SCORE_WEIGHTS.volVsAvg +
-        rsNorm  * SCORE_WEIGHTS.rs +
-        nhNorm  * SCORE_WEIGHTS.nearHigh +
-        maNorm  * SCORE_WEIGHTS.maStack;
-      return Math.round(score01 * 100);
-    }
+  // leadership: RS slope last 20d
+  const rs = closes.slice(-RS_LOOKBACK).map((p,i)=> p/(benchCloses[benchCloses.length-RS_LOOKBACK+i]||p));
+  let slope=0;
+  for(let i=1;i<rs.length;i++){ slope += rs[i]-rs[i-1]; }
+  const leader = slope > 0;
 
-    async function fetchBenchmarkCloses(){
-      const b = await yahooChart(BENCHMARK, '6mo', '1d');
-      return (b?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || []).filter(v=>v!=null);
-    }
+  // location: near high + above 50d
+  const win = closes.slice(-NEAR_HIGH_LOOK);
+  const high = Math.max(...win);
+  const nearHigh = price/high - 1;        // negative = below high
+  const above50  = price > sma(closes, MA50);
 
-    async function computeMetricsFor(symbol, benchCloses){
-      const t = yTicker(symbol);
-      const ch = await yahooChart(t, '1y', '1d');
-      const c = ch?.chart?.result?.[0];
-      const q = c?.indicators?.quote?.[0];
-      const closes  = (q?.close  || []).filter(v=>v!=null);
-      const volumes = (q?.volume || []).filter(v=>v!=null);
-      if (!closes.length || !volumes.length) throw new Error('no data for '+t);
+  // ignition watch (yesterday/today)
+  const volAvg = sma(vols, VOL_WIN);
+  const ignitionVol = (vols[vols.length-1]||0)/(volAvg||1) >= TH.ignitionVol;
+  const lastRet = (closes[closes.length-1]/closes[closes.length-2]-1) || 0;
+  const ignitionRet = lastRet >= TH.ignitionRet;
 
-      const price = closes[closes.length-1];
+  // score
+  let score = 0;
+  if(squeeze) score+=25;
+  if(nrClusterHit) score+=20;
+  if(acc) score+=20;
+  if(leader) score+=20;
+  if(nearHigh>=TH.nearHigh && above50) score+=15;
+  // ignition adds warning chip but doesn't inflate pre-breakout; it’s a “go time” hint.
 
-      // Volume vs 20d avg
-      const recentVol = volumes[volumes.length-1];
-      const avgVol = volumes.slice(-AVG_VOL_WINDOW).reduce((a,b)=>a+b,0)/Math.max(1, Math.min(AVG_VOL_WINDOW, volumes.length));
-      const volVsAvg = recentVol / (avgVol || 1);
+  const chips = [];
+  chips.push({t:'ATR% low (squeeze)', ok:squeeze});
+  chips.push({t:'NR4/NR7 cluster', ok:nrClusterHit});
+  chips.push({t:'Accumulation', ok:acc});
+  chips.push({t:'RS slope↑ (lead)', ok:leader});
+  chips.push({t:'≤10% under 30-day high', ok:nearHigh>=TH.nearHigh});
+  chips.push({t:'50-DMA rising & above', ok:above50});
+  chips.push({t:'Ignition vol', ok:ignitionVol, warn:true});
+  chips.push({t:'Ignition +% day', ok:ignitionRet, warn:true});
 
-      // RS vs benchmark
-      const bc = benchCloses;
-      const p0 = closes[Math.max(0, closes.length-1-RS_LOOKBACK)];
-      const b0 = bc[Math.max(0, bc.length-1-RS_LOOKBACK)];
-      const rs = (price/p0) / ((bc[bc.length-1]||p0)/(b0||bc[0]||1)) - 1;
+  return {score, chips, parts:{nearHigh, above50}};
+}
 
-      // Price vs 30d high
-      const windowCloses = closes.slice(-HIGH_LOOKBACK);
-      const high = Math.max(...windowCloses);
-      const nearHigh = price/high - 1;
+/* ========= Intrinsic Valuation =========
+   Uses Yahoo fundamentals (best-effort). Falls back to “—” gracefully.
+*/
+function zScore(x,lo,hi){ if(x==null) return 0.5; if(lo==hi) return 0.5; const t=(x-lo)/(hi-lo); return Math.max(0, Math.min(1, t)); }
+function fairValueFromFundamentals(f, price){
+  // Extracts with undefined-safe guards
+  const ps   = f?.price?.priceToSalesTrailing12Months?.raw ?? f?.defaultKeyStatistics?.priceToSalesTrailing12Months?.raw;
+  const revG = f?.financialData?.revenueGrowth?.raw;                // yoy
+  const fcfQ = f?.cashflowStatementHistory?.cashflowStatements?.[0]?.freeCashFlow?.raw;
+  const revT = f?.incomeStatementHistory?.incomeStatementHistory?.[0]?.totalRevenue?.raw;
+  const fcfM = (fcfQ!=null && revT) ? (fcfQ/revT) : null;
+  const gm   = f?.financialData?.grossMargins?.raw;                 // %
+  const sbc  = f?.cashflowStatementHistory?.cashflowStatements?.[0]?.stockBasedCompensation?.raw;
+  const shares= f?.defaultKeyStatistics?.sharesOutstanding?.raw;
+  const dilR = f?.defaultKeyStatistics?.sharesPercentSharesOut?.raw; // not perfect; placeholder
+  const debt = f?.financialData?.totalDebt?.raw;
+  const cash = f?.financialData?.totalCash?.raw;
+  const netLev = (debt??0)-(cash??0);
 
-      // MAs
-      const ma50  = sma(closes, MA50_WINDOW);
-      const ma200 = sma(closes, MA200_WINDOW);
-      const above50 = price > ma50, above200 = price > ma200;
+  // Normalizations (broad, heuristic)
+  const nPS = 1 - zScore(ps, 1, 12);            // cheaper P/S is better
+  const nG  = zScore(revG, -0.1, 0.5);          // -10%..+50%
+  const nFCF= zScore(fcfM, -0.1, 0.3);          // -10%..+30%
+  const nGM = zScore(gm, 0.2, 0.8);             // 20%..80%
+  const nSBC= 1 - zScore((sbc&&revT)?sbc/revT:null, 0, 0.15);
+  const nDil= 1 - zScore(dilR, 0, 0.1);
+  const nLev= 1 - zScore((netLev&&revT)?netLev/revT:null, 0, 1.0);
+  // tiny trend premium sourced from Google Trends is omitted (no numeric series here), keep neutral
+  const nTrend = 0.5;
 
-      const strength = computeStrength({ volVsAvg, rs, nearHigh, above50, above200 });
+  const score01 =
+      VW.ps*nPS + VW.growth*nG + VW.fcf*nFCF + VW.gm*nGM +
+      VW.sbc*nSBC + VW.dilution*nDil + VW.leverage*nLev + VW.trend*nTrend;
 
-      return { ticker:t, closes, volumes, price, volVsAvg, rs, nearHigh, above50, above200, strength };
-    }
+  // Map score to a fair-value multiple of current price: 0.2..1.8x
+  const fvMult = 0.2 + 1.6*score01;
+  const fair = price ? fvMult * price : null;
 
-    /* =============================
-       NEWS (Google News RSS)
-       ============================= */
-    function cleanNameForQuery(name){ return String(name || '').replace(/\(.*?\)/g,'').trim(); }
-    function relTime(d){
-      const t = new Date(d).getTime(); if(!isFinite(t)) return '';
-      const mins = Math.max(1, Math.round((Date.now() - t)/60000));
-      if (mins < 60) return `${mins}m`; const hrs = Math.round(mins/60);
-      if (hrs < 24) return `${hrs}h`; return `${Math.round(hrs/24)}d`;
-    }
-    async function fetchNewsItems(query){
-      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-      const xmlText = await getRaw(url);
-      const doc = new DOMParser().parseFromString(xmlText, "text/xml");
-      const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
-        const title = node.getElementsByTagName('title')[0]?.textContent || '';
-        const link  = node.getElementsByTagName('link')[0]?.textContent || '#';
-        const pub   = node.getElementsByTagName('pubDate')[0]?.textContent || '';
-        const source= node.getElementsByTagName('source')[0]?.textContent || '';
-        return { title, link, pub, source };
-      });
-      return items;
-    }
-    function renderNewsList(container, items){
-      if(!container) return;
-      if(!items?.length){
-        container.innerHTML = `<div class="news"><h3>Latest News</h3><div style="color:var(--muted)">—</div></div>`;
-        return;
-      }
-      container.innerHTML = `
+  return {fair, mult:fvMult, score:Math.round(score01*100),
+          parts:{ps,revG,fcfM,gm,sbc,revT,netLev}};
+}
+
+/* ========= UI build ========= */
+const grid = document.getElementById('grid');
+
+function buildRow(item, idx, pre, val, series){
+  const rid = rowIdFromSymbol(item.symbol);
+
+  // LEFT
+  const left=document.createElement('div'); left.className='card';
+  const hL=document.createElement('h2'); hL.textContent = `${item.name} — Price`;
+  const cL=document.createElement('div'); cL.className='chart';
+  left.appendChild(hL); left.appendChild(cL);
+
+  // MIDDLE
+  const mid=document.createElement('div'); mid.className='card';
+  const hM=document.createElement('h2'); hM.textContent = `Google Trends — “${item.trendTerm}” (1m, Worldwide)`;
+  const cM=document.createElement('div'); cM.className='trend';
+  mid.appendChild(hM); mid.appendChild(cM);
+
+  // RIGHT
+  const right=document.createElement('div'); right.className='card';
+  const badge=document.createElement('div'); badge.className='badge'; badge.innerHTML=`Pre-Breakout: <strong>${pre?.score??0}</strong>`;
+  const hR=document.createElement('h2'); hR.textContent='Potential Breakthrough + Valuation';
+  const rm=document.createElement('button'); rm.className='remove-btn'; rm.textContent='Remove';
+  rm.addEventListener('click',()=>removeStock(item.symbol));
+
+  // subcards
+  const sc1=document.createElement('div'); sc1.className='subcard';
+  sc1.innerHTML=`
+    <div class="grid2">
+      <div>
+        <table>
+          <thead><tr><th>Pre-Breakout Metric</th><th class="val">State</th></tr></thead>
+          <tbody id="${cellId(rid,'pre-metrics')}"></tbody>
+        </table>
+      </div>
+      <div>
+        <div class="chips" id="${cellId(rid,'pre-chips')}"></div>
+      </div>
+    </div>`;
+
+  const sc2=document.createElement('div'); sc2.className='subcard';
+  sc2.innerHTML=`
+    <div class="grid2">
+      <div>
+        <table>
+          <thead><tr><th>Intrinsic Valuation</th><th class="val">Value</th></tr></thead>
+          <tbody id="${cellId(rid,'val-rows')}">
+            <tr><td>Fair Value / Share</td><td class="val" id="${cellId(rid,'fair')}">—</td></tr>
+            <tr><td>FV Multiple vs Price</td><td class="val" id="${cellId(rid,'fvm')}">—</td></tr>
+            <tr><td>Valuation Score</td><td class="val" id="${cellId(rid,'vscore')}">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
         <div class="news">
           <h3>Latest News</h3>
-          <ul>
-            ${items.map(it => `
-              <li>
-                <a href="${it.link}" target="_blank" rel="noopener noreferrer">${it.title}</a>
-                ${it.source ? ` <span style="color:var(--muted);font-size:11px">(${it.source})</span>` : ''}
-                ${it.pub ? `<time>· ${relTime(it.pub)}</time>` : ''}
-              </li>
-            `).join('')}
-          </ul>
-        </div>`;
-    }
-    async function populateNewsByMount(mount, item){
-      const tkr = yTicker(item.symbol);
-      const name = cleanNameForQuery(item.name);
-      const query = `${tkr} stock OR ${name} stock`;
-      try{
-        const items = await fetchNewsItems(query);
-        renderNewsList(mount, items);
-      }catch(e){
-        renderNewsList(mount, []);
-        console.error('News error', item, e);
-      }
-    }
+          <ul id="${cellId(rid,'news')}"></ul>
+        </div>
+      </div>
+    </div>`;
 
-    /* =============================
-       BUILD (STABLE IDS + SORTING)
-       ============================= */
-    function buildRow(item, _idx, metrics){
-      const rid = rowIdFromSymbol(item.symbol);
+  right.appendChild(badge); right.appendChild(hR); right.appendChild(rm); right.appendChild(sc1); right.appendChild(sc2);
 
-      // LEFT — TradingView
-      const left=document.createElement('div'); left.className='card';
-      const hL=document.createElement('h2'); hL.textContent=`${item.name} — Price & Chart`;
-      const cL=document.createElement('div'); cL.className='chart';
-      left.appendChild(hL); left.appendChild(cL);
+  grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
 
-      // MIDDLE — Trends
-      const mid=document.createElement('div'); mid.className='card';
-      const hM=document.createElement('h2'); hM.textContent=`Google Trends — “${item.trendTerm}” (1 month, Worldwide)`;
-      const cM=document.createElement('div'); cM.className='trend'; cM.id=`trend-${rid}`;
-      mid.appendChild(hM); mid.appendChild(cM);
+  // mounts
+  renderTV(cL, item.symbol);
+  renderTrends(cM, item.trendTerm);
 
-      // RIGHT — Radar + News
-      const right=document.createElement('div'); right.className='card';
-      const strength=document.createElement('div'); strength.className='strength-badge';
-      strength.innerHTML = `Strength: <strong>${metrics.strength}</strong>`;
-      const hR=document.createElement('h2'); hR.textContent='Breakout Radar';
-      const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
-      remove.addEventListener('click',()=> removeStockBySymbol(item.symbol));
+  // paint pre-breakout metrics
+  const pm = document.getElementById(cellId(rid,'pre-metrics'));
+  const pc = document.getElementById(cellId(rid,'pre-chips'));
+  if(pm && pre){
+    pm.innerHTML = `
+      <tr><td>Squeeze (BB width low)</td><td class="val">${pre.chips[0]?.ok?'✅':'—'}</td></tr>
+      <tr><td>NR4 / NR7 cluster</td><td class="val">${pre.chips[1]?.ok?'✅':'—'}</td></tr>
+      <tr><td>Accumulation (up-vol)</td><td class="val">${pre.chips[2]?.ok?'✅':'—'}</td></tr>
+      <tr><td>Leadership (RS slope)</td><td class="val">${pre.chips[3]?.ok?'✅':'—'}</td></tr>
+      <tr><td>Location (≤10% below 30d high & above 50d)</td><td class="val">${pre.chips[4]?.ok && pre.chips[5]?.ok ? '✅':'—'}</td></tr>
+      <tr><td>Ignition watch (vol & day%)</td><td class="val">${(pre.chips[6]?.ok||pre.chips[7]?.ok)?'⚠️':'—'}</td></tr>`;
+    pc.innerHTML = pre.chips.map(c=>`<span class="chip ${c.warn?'warn':(c.ok?'ok':'')}">${c.t}</span>`).join('');
+  }else{ if(pm) pm.innerHTML = `<tr><td colspan="2" style="color:var(--muted)">—</td></tr>`; }
 
-      const tbl=document.createElement('table');
-      tbl.innerHTML = `
-        <thead><tr><th>Metric</th><th class="val">Value</th><th class="sig">Signal</th></tr></thead>
-        <tbody>
-          <tr><td>Volume vs 20d Avg</td><td id="${cellId(rid,'vavg')}"   class="val">—</td><td id="${cellId(rid,'vavg-s')}"   class="sig">—</td></tr>
-          <tr><td>RS vs ${BENCHMARK} (${RS_LOOKBACK}d)</td><td id="${cellId(rid,'rs')}"     class="val">—</td><td id="${cellId(rid,'rs-s')}"     class="sig">—</td></tr>
-          <tr><td>Price vs 30d High</td><td id="${cellId(rid,'phigh')}"  class="val">—</td><td id="${cellId(rid,'phigh-s')}"  class="sig">—</td></tr>
-          <tr><td>Above 50d / 200d MA</td><td id="${cellId(rid,'ma')}"   class="val">—</td><td id="${cellId(rid,'ma-s')}"     class="sig">—</td></tr>
-          <tr><td>Next Earnings</td><td id="${cellId(rid,'earn')}"  class="val">—</td><td class="sig">—</td></tr>
-          <tr><td>Trend (30 bars)</td><td colspan="2"><div id="${cellId(rid,'spark')}" class="spark"></div></td></tr>
-        </tbody>`;
+  // paint valuation
+  if(val){
+    const fair = document.getElementById(cellId(rid,'fair'));
+    const fvm  = document.getElementById(cellId(rid,'fvm'));
+    const vs   = document.getElementById(cellId(rid,'vscore'));
+    if(fair) fair.textContent = val.fair ? ('$'+val.fair.toFixed(2)) : '—';
+    if(fvm)  fvm.textContent  = val.mult ? (val.mult.toFixed(2)+'x') : '—';
+    if(vs)   vs.textContent   = (val.score!=null) ? (val.score+'/100') : '—';
+  }
 
-      right.appendChild(strength); right.appendChild(hR); right.appendChild(remove); right.appendChild(tbl);
+  // news
+  (async ()=>{
+    try{
+      const q=`${yTicker(item.symbol)} stock OR ${String(item.name).replace(/\(.*?\)/g,'').trim()} stock`;
+      const n=await fetchNews(q);
+      const ul=document.getElementById(cellId(rid,'news'));
+      if(!ul){return;}
+      ul.innerHTML = n.map(x=>`<li><a target="_blank" rel="noopener" href="${x.link}">${x.title}</a>${x.src?` <span style="color:var(--muted);font-size:11px">(${x.src})</span>`:''}${x.pub?` <time>· ${relTime(x.pub)}</time>`:''}</li>`).join('') || `<li style="color:var(--muted)">—</li>`;
+    }catch{ const ul=document.getElementById(cellId(rid,'news')); if(ul) ul.innerHTML=`<li style="color:var(--muted)">—</li>`; }
+  })();
+}
 
-      const newsBox = document.createElement('div');
-      newsBox.id = `${cellId(rid,'news')}`;
-      newsBox.className = 'news';
-      right.appendChild(newsBox);
+/* ========= Pipeline ========= */
+async function computeRow(item){
+  const t = yTicker(item.symbol);
+  try{
+    const [s,b] = await Promise.all([
+      yahooChart(t,'1y','1d'),
+      yahooChart(BENCHMARK,'6mo','1d')
+    ]);
+    const sc = s?.chart?.result?.[0];
+    const q  = sc?.indicators?.quote?.[0]||{};
+    const closes=(q.close||[]).filter(v=>v!=null);
+    const highs =(q.high ||[]).filter(v=>v!=null);
+    const lows  =(q.low  ||[]).filter(v=>v!=null);
+    const vols  =(q.volume||[]).filter(v=>v!=null);
+    const price = closes[closes.length-1]||null;
 
-      grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
+    const bc = b?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null) || [];
 
-      // Embeds
-      renderTradingView(cL, item.symbol);
-      renderTrends(cM, item.trendTerm);
+    const pre = preBreakoutFromSeries(closes, highs, lows, vols, bc);
 
-      // Sparkline + metrics paint
-      drawSparkline(document.getElementById(cellId(rid,'spark')), metrics.closes.slice(-30));
+    // valuation best-effort
+    let val=null;
+    try{
+      const f = await yahooFundamentals(t);
+      const obj = f?.quoteSummary?.result?.[0] || null;
+      val = fairValueFromFundamentals(obj, price);
+    }catch{ val = {fair:null, mult:null, score:null}; }
 
-      const setSigPaint = (valId, sigId, passed, text) => {
-        const v = document.getElementById(valId), s = document.getElementById(sigId);
-        v.textContent = text; s.textContent = passed ? '✅':'—';
-        s.className = 'sig ' + (passed ? 'ok':'ko'); v.className = 'val ' + (passed ? 'ok':'ko');
-      };
+    return {pre, val, series:{closes}};
+  }catch(e){
+    console.error('row compute error', t, e);
+    return {pre:{score:0, chips:[]}, val:{fair:null,mult:null,score:null}, series:{closes:[]}};
+  }
+}
 
-      setSigPaint(cellId(rid,'vavg'),  cellId(rid,'vavg-s'),  metrics.volVsAvg >= THRESHOLDS.volVsAvg,    metrics.volVsAvg.toFixed(2)+'x');
-      setSigPaint(cellId(rid,'rs'),    cellId(rid,'rs-s'),    metrics.rs      >= THRESHOLDS.rsOutperformance, (metrics.rs*100).toFixed(1)+'%');
-      setSigPaint(cellId(rid,'phigh'), cellId(rid,'phigh-s'), metrics.nearHigh>= THRESHOLDS.nearHighPct, (metrics.nearHigh*100).toFixed(1)+'%');
+/* ========= Orchestration / storage ========= */
+function getList(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw) return DEFAULT_WATCHLIST.slice();
+    const a=JSON.parse(raw); return (Array.isArray(a)&&a.length)?a:DEFAULT_WATCHLIST.slice();
+  }catch{ return DEFAULT_WATCHLIST.slice(); }
+}
+function setList(a){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(a)); }catch{} }
 
-      const mCell = document.getElementById(cellId(rid,'ma'));
-      const mSig  = document.getElementById(cellId(rid,'ma-s'));
-      mCell.textContent = `${metrics.above50?'Above':'Below'} 50d / ${metrics.above200?'Above':'Below'} 200d`;
-      mSig.textContent = (metrics.above50 && metrics.above200) ? '✅' : '—';
-      mSig.className = 'sig ' + ((metrics.above50 && metrics.above200) ? 'ok':'ko');
+async function renderAll(){
+  grid.innerHTML='';
+  const list=getList();
+  // compute sequentially (gentle on proxies)
+  for(const it of list){
+    const res=await computeRow(it);
+    buildRow(it, 0, res.pre, res.val, res.series);
+  }
+  document.getElementById('last-updated').textContent='Last updated: '+new Date().toLocaleTimeString();
+}
 
-      // Earnings async
-      (async ()=>{
-        try{
-          const ej = await yahooEarnings(metrics.ticker);
-          const raw = ej?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
-          document.getElementById(cellId(rid,'earn')).textContent = raw ? new Date(raw*1000).toISOString().slice(0,10) : '—';
-        }catch{ document.getElementById(cellId(rid,'earn')).textContent = '—'; }
-      })();
+function addStock(){
+  const s=document.getElementById('in-symbol').value.trim();
+  const n=document.getElementById('in-name').value.trim() || s;
+  const t=document.getElementById('in-trend').value.trim() || n;
+  if(!s){ alert('Enter symbol in EXCHANGE:TICKER (e.g., NASDAQ:MVIS)'); return; }
+  const L=getList();
+  const key=yTicker(s);
+  const i=L.findIndex(x=>yTicker(x.symbol)===key);
+  if(i===-1) L.push({symbol:s,name:n,trendTerm:t}); else L[i]={symbol:s,name:n,trendTerm:t};
+  setList(L); renderAll();
+  document.getElementById('in-symbol').value='';
+  document.getElementById('in-name').value='';
+  document.getElementById('in-trend').value='';
+}
+function removeStock(symbol){
+  const key=yTicker(symbol);
+  const L=getList().filter(x=>yTicker(x.symbol)!==key);
+  setList(L); renderAll();
+}
+function resetDefaults(){ setList(DEFAULT_WATCHLIST.slice()); renderAll(); }
 
-      // News
-      populateNewsByMount(document.getElementById(cellId(rid,'news')), item);
-    }
+document.getElementById('btn-add').addEventListener('click', addStock);
+document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+document.getElementById('btn-refresh').addEventListener('click', renderAll);
 
-    async function buildSortedMetrics(list){
-      const benchCloses = await fetchBenchmarkCloses();
-      const results = [];
-      for (const it of list){
-        try{
-          const m = await computeMetricsFor(it.symbol, benchCloses);
-          results.push({ item: it, metrics: m });
-        }catch(e){
-          console.error('metrics error', it, e);
-          results.push({ item: it, metrics: { strength: 0, closes: [], price: 0, volVsAvg:0, rs:0, nearHigh:-1, above50:false, above200:false, ticker:yTicker(it.symbol) } });
-        }
-      }
-      results.sort((a,b)=> b.metrics.strength - a.metrics.strength);
-      return results;
-    }
-
-    async function renderAllSorted(){
-      grid.innerHTML='';
-      const list = getWatchlist();
-      const results = await buildSortedMetrics(list);
-      results.forEach((res, i) => buildRow(res.item, i, res.metrics));
-      updateTimestamp();
-    }
-
-    /* =============================
-       ADD / REMOVE (by symbol, deduped)
-       ============================= */
-    function addStock(){
-      const s = document.getElementById('in-symbol').value.trim();
-      const n = document.getElementById('in-name').value.trim() || s;
-      const t = document.getElementById('in-trend').value.trim() || n;
-      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
-      const list = getWatchlist();
-      const key = yTicker(s);
-      const idx = list.findIndex(x => yTicker(x.symbol) === key);
-      if(idx === -1) list.push({ symbol:s, name:n, trendTerm:t });
-      else           list[idx] = { symbol:s, name:n, trendTerm:t }; // update
-      setWatchlist(list);
-      renderAllSorted();
-      document.getElementById('in-symbol').value='';
-      document.getElementById('in-name').value='';
-      document.getElementById('in-trend').value='';
-    }
-
-    function removeStockBySymbol(symbol){
-      const key = yTicker(symbol);
-      const list = getWatchlist().filter(x => yTicker(x.symbol) !== key);
-      setWatchlist(list);
-      renderAllSorted();
-    }
-
-    function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAllSorted(); }
-
-    function updateTimestamp(){
-      const ts = new Date().toLocaleTimeString();
-      const el = document.getElementById('last-updated');
-      if (!el) return;
-      el.textContent = `Last updated: ${ts}`;
-      el.style.color = 'var(--good)';
-      setTimeout(()=>{ el.style.color='var(--muted)'; }, 1500);
-    }
-
-    function refreshNow(){ renderAllSorted(); }
-
-    document.getElementById('btn-add').addEventListener('click', addStock);
-    document.getElementById('btn-reset').addEventListener('click', resetDefaults);
-    document.getElementById('btn-refresh').addEventListener('click', refreshNow);
-
-    // Initial render
-    renderAllSorted();
-
-    // Auto-refresh radar + resort every 5 minutes
-    setInterval(renderAllSorted, REFRESH_MS);
-
-    // Auto-refresh news every 15 minutes (only mounts that exist)
-    setInterval(async () => {
-      const list = getWatchlist();
-      list.forEach((it) => {
-        const rid = rowIdFromSymbol(it.symbol);
-        const mount = document.getElementById(cellId(rid,'news'));
-        if (mount) populateNewsByMount(mount, it);
-      });
-    }, NEWS_REFRESH_MS);
-  </script>
+/* ========= Go ========= */
+renderAll();
+// soft auto-refresh every 5 min
+setInterval(renderAll, 5*60*1000);
+</script>
 </body>
 </html>
