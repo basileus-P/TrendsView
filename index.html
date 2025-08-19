@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Breakthrough Watch — Price • Google Trends (1m) • Pre-Breakout Radar + News</title>
+<title>Breakthrough Watch — Price • Trends (1m) • Radar + News</title>
 <style>
   :root{
     --bg:#0b0f14;--panel:#111826;--border:#1c2633;--text:#e6eef7;--muted:#9fb3c8;
@@ -25,7 +25,6 @@
   .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600}
   .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
   .remove-btn:hover{filter:brightness(1.1)}
-
   .score{font-size:22px;font-weight:800;margin:2px 0 6px}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--border);margin-left:8px;color:var(--muted)}
   .score.good{color:var(--good)} .score.mid{color:var(--warn)} .score.bad{color:var(--bad)}
@@ -44,7 +43,6 @@
   .news a:hover{text-decoration:underline}
   .news time{color:var(--muted);font-size:11px;margin-left:6px}
 
-  /* TradingView hygiene */
   .tradingview-widget-container{height:100%}
   .tradingview-widget-container__widget{height:100% !important; min-height:320px}
   .row .card:first-child{overflow:hidden}
@@ -54,7 +52,7 @@
 </head>
 <body>
 <header>
-  <h1>Breakthrough Watch — Price • Google Trends (1m) • Pre-Breakout Radar + News</h1>
+  <h1>Breakthrough Watch — Price • Trends (1m) • Radar + News</h1>
   <div class="toolbar">
     <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26"/>
     <input id="in-name" placeholder="Display name" size="18"/>
@@ -62,121 +60,56 @@
     <button id="btn-add">Add / Update</button>
     <button id="btn-reset">Reset defaults</button>
     <button id="btn-refresh">Refresh Now</button>
-    <select id="sortby">
-      <option value="score">Sort: Score (desc)</option>
-      <option value="name">Sort: Name (A→Z)</option>
-    </select>
+    <select id="sortby"><option value="score">Sort: Score (desc)</option><option value="name">Sort: Name (A→Z)</option></select>
     <span id="last-updated"></span>
   </div>
 </header>
 
 <div id="grid" class="container"></div>
 
-<!-- Google Trends embed loader -->
 <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
 <script>
-/* =========================
-   CONFIG
-   ========================= */
-const STORAGE_KEY='WATCHLIST_PREBREAKOUT_V3';
+/* ===== YOU MUST SET THIS TO YOUR WORKER ===== */
+const PROXY_BASE = 'https://YOUR_WORKER_SUBDOMAIN.workers.dev/fetch?url=';
+
+/* ===== CONFIG ===== */
+const STORAGE_KEY='WATCHLIST_PREBREAKOUT_V4';
 const DEFAULT_WATCHLIST=[
   { symbol:"NASDAQ:MVIS", name:"MicroVision (MVIS)", trendTerm:"MicroVision" },
   { symbol:"NASDAQ:QSI",  name:"Quantum-Si (QSI)",   trendTerm:"Quantum-Si" },
   { symbol:"NASDAQ:REKR", name:"Rekor Systems (REKR)", trendTerm:"Rekor Systems" }
 ];
-const TRENDS_GEO="";               // worldwide
-const TRENDS_TIME="today 1-m";     // 1 month
-const BENCHMARK="QQQ";             // RS baseline
-const AUTO_REFRESH_MS=7*60*1000;   // 7m to avoid 429 storms
-const Y_RANGE='1y';                // Yahoo range
-const Y_INTERVAL='1d';
+const TRENDS_GEO=""; const TRENDS_TIME="today 1-m";
+const BENCHMARK="QQQ"; const AUTO_REFRESH_MS=7*60*1000;
+const Y_RANGE='1y', Y_INTERVAL='1d';
 
-/* =========================
-   PROXY FETCH (queue + cache + backoff)
-   ========================= */
-const PROXIES=[
-  (url)=>`https://r.jina.ai/https://${url.replace(/^https?:\/\//,'')}`,
-  (url)=>`https://r.jina.ai/http://${url.replace(/^https?:\/\//,'')}`,
-  (url)=>`https://thingproxy.freeboard.io/fetch/${url}`,
-  (url)=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url)=>`https://cors.isomorphic-git.org/${url}`,
-  (url)=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-];
-const FETCH_CONCURRENCY=2;
-const FETCH_DELAY_MS=250;
-const CACHE_TTL_MS=10*60*1000;
-
-let activeTasks=0; const taskQueue=[];
-function enqueueTask(fn){ return new Promise((resolve,reject)=>{ taskQueue.push({fn,resolve,reject}); pump(); }); }
-async function pump(){
-  if(activeTasks>=FETCH_CONCURRENCY || !taskQueue.length) return;
-  const {fn,resolve,reject}=taskQueue.shift();
-  activeTasks++;
-  try{ const v=await fn(); resolve(v); }
-  catch(e){ reject(e); }
-  finally{ activeTasks--; setTimeout(pump, FETCH_DELAY_MS); }
-}
-function cacheGet(key){
-  try{ const raw=sessionStorage.getItem('cache:'+key); if(!raw) return null;
-       const obj=JSON.parse(raw); if(Date.now()-obj.t>CACHE_TTL_MS) return null; return obj.v; }catch{return null}
-}
-function cacheSet(key,val){ try{ sessionStorage.setItem('cache:'+key, JSON.stringify({t:Date.now(),v:val})) }catch{} }
-async function proxyFetchText(url){
-  const cacheKey=url;
-  const hit=cacheGet(cacheKey); if(hit) return hit;
-  let lastErr;
-  for(let round=1; round<=2; round++){
-    for(const make of PROXIES){
-      try{
-        const prox=make(url);
-        const withBuster = prox + (prox.includes('allorigins')||prox.includes('freeboard')||prox.includes('codetabs')
-                                   ? '' : (prox.includes('?')?'&':'?')+'noCache='+Date.now());
-        const r=await fetch(withBuster,{method:'GET'});
-        if(!r.ok){
-          if(r.status===429||r.status===503){ await new Promise(res=>setTimeout(res, Math.min(2000*round,8000))); }
-          throw new Error('status '+r.status);
-        }
-        const txt=await r.text();
-        if(!txt || !txt.trim()) throw new Error('empty');
-        cacheSet(cacheKey,txt); return txt;
-      }catch(e){ lastErr=e; }
-    }
-  }
-  throw lastErr||new Error('all proxies failed');
-}
-function getRaw(url){ return enqueueTask(()=>proxyFetchText(url)); }
-
-/* =========================
-   STORAGE / IDs
-   ========================= */
-function getWatchlist(){
-  try{ const raw=localStorage.getItem(STORAGE_KEY);
-       if(!raw) return DEFAULT_WATCHLIST.slice();
-       const arr=JSON.parse(raw); return Array.isArray(arr)&&arr.length?arr:DEFAULT_WATCHLIST.slice();
-  }catch{ return DEFAULT_WATCHLIST.slice(); }
-}
-function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
-function yTicker(sym){ return String(sym||'').split(':').pop().trim().toUpperCase(); }
-function rowIdFromSymbol(symbol){ return 'row-'+yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
-function cid(rid,key){ return `${key}-${rid}`; }
-
-/* =========================
-   MATH / INDICATORS
-   ========================= */
+/* ===== HELPERS ===== */
 const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
 function stdev(a){ const m=mean(a); return Math.sqrt(mean(a.map(x=>(x-m)*(x-m)))); }
 function sma(arr,n){ const s=arr.slice(-n); return s.reduce((a,b)=>a+b,0)/Math.max(1,s.length); }
 function percentileRank(arr,val){ if(!arr.length) return 0; let below=0; for(const v of arr){ if(v<=val) below++; } return below/arr.length; }
 function trueRange(h,l,pc){ return Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc)); }
+function yTicker(sym){ return String(sym||'').split(':').pop().trim().toUpperCase(); }
+function rowIdFromSymbol(symbol){ return 'row-'+yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
+function cid(rid,key){ return `${key}-${rid}`; }
+function relTime(d){ const t=new Date(d).getTime(); if(!isFinite(t)) return ''; const m=Math.max(1,Math.round((Date.now()-t)/60000)); if(m<60)return m+'m'; const h=Math.round(m/60); if(h<24)return h+'h'; return Math.round(h/24)+'d'; }
 
-/* =========================
-   YAHOO CHART JSON (via proxy)
-   ========================= */
+function getWatchlist(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return DEFAULT_WATCHLIST.slice(); const arr=JSON.parse(raw); return Array.isArray(arr)&&arr.length?arr:DEFAULT_WATCHLIST.slice(); }catch{ return DEFAULT_WATCHLIST.slice(); } }
+function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
+
+/* ===== SINGLE PROXY FETCH ===== */
+async function getRawDirect(target){
+  const url = PROXY_BASE + encodeURIComponent(target);
+  const r = await fetch(url,{method:'GET'});
+  if(!r.ok) throw new Error('status '+r.status);
+  return await r.text();
+}
+
+/* ===== DATA SOURCES THROUGH WORKER ===== */
 async function fetchYahooChart(symbol, range=Y_RANGE, interval=Y_INTERVAL){
-  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&includePrePost=false&events=div%7Csplit`;
-  const txt=await getRaw(url);
-  // Sometimes proxies wrap or inject junk; be defensive
-  const safe = txt.trim().replace(/^[^{\[]+/, ''); // drop any leading junk before JSON
+  const t = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&includePrePost=false&events=div%7Csplit`;
+  const txt = await getRawDirect(t);
+  const safe = txt.trim().replace(/^[^{\[]+/, '');
   const data=JSON.parse(safe);
   const res=data?.chart?.result?.[0];
   if(!res) throw new Error('no chart result');
@@ -193,13 +126,9 @@ async function fetchYahooChart(symbol, range=Y_RANGE, interval=Y_INTERVAL){
   return out;
 }
 
-/* =========================
-   NEWS (Bing RSS via proxy)
-   ========================= */
-function relTime(d){ const t=new Date(d).getTime(); if(!isFinite(t)) return ''; const m=Math.max(1,Math.round((Date.now()-t)/60000)); if(m<60)return m+'m'; const h=Math.round(m/60); if(h<24)return h+'h'; return Math.round(h/24)+'d'; }
 async function fetchNewsItems(query){
-  const url=`https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=RSS`;
-  const xml=await getRaw(url);
+  const t = `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=RSS`;
+  const xml=await getRawDirect(t);
   const doc=new DOMParser().parseFromString(xml,"text/xml");
   return [...doc.getElementsByTagName('item')].slice(0,3).map(n=>{
     const title=n.getElementsByTagName('title')[0]?.textContent||'';
@@ -210,9 +139,7 @@ async function fetchNewsItems(query){
   });
 }
 
-/* =========================
-   TRENDS + TRADINGVIEW
-   ========================= */
+/* ===== TRENDS / TRADINGVIEW ===== */
 function renderTrends(container, keyword){
   try{
     if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
@@ -223,7 +150,8 @@ function renderTrends(container, keyword){
       ); return;
     }
     const src=`https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
-    const iframe=document.createElement('iframe'); iframe.src=src; iframe.width='100%'; iframe.height='360'; iframe.frameBorder='0'; container.appendChild(iframe);
+    const iframe=document.createElement('iframe'); iframe.src=src; iframe.width='100%'; iframe.height='360'; iframe.loading='lazy'; iframe.referrerPolicy='no-referrer-when-downgrade'; iframe.frameBorder='0';
+    container.appendChild(iframe);
   }catch(e){ const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends error: '+e.message; container.appendChild(err); }
 }
 function renderTradingView(container, symbol){
@@ -237,9 +165,7 @@ function renderTradingView(container, symbol){
   setTimeout(()=>container.appendChild(s),0);
 }
 
-/* =========================
-   SPARKLINE
-   ========================= */
+/* ===== SPARKLINE ===== */
 function renderSparkline(el, arr){
   if(!el || !arr || arr.length<2){ el.innerHTML=''; return; }
   const w=el.clientWidth||260, h=34, p=2;
@@ -249,49 +175,36 @@ function renderSparkline(el, arr){
   el.innerHTML=`<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="#8fb6ff" stroke-width="1.5"/></svg>`;
 }
 
-/* =========================
-   PRE-BREAKOUT SCORE (same logic, runs on Yahoo bars)
-   ========================= */
+/* ===== SCORE ===== */
 function computePreBreakout(rows, benchRows){
   if(rows.length<220 || benchRows.length<60) return {score:0,detail:null};
   const closes=rows.map(r=>r.close), highs=rows.map(r=>r.high), lows=rows.map(r=>r.low), vols=rows.map(r=>r.volume);
 
-  // ATR% percentile (20)
   const TR=rows.map((r,i)=> i? trueRange(r.high,r.low,rows[i-1].close) : (r.high-r.low));
   const ATR20=TR.map((_,i)=> i>=19? mean(TR.slice(i-19,i+1)) : NaN);
   const atrPctSeries=ATR20.map((a,i)=> (i>=19&&closes[i]>0)? a/closes[i] : NaN).filter(Number.isFinite);
   const atrPct=atrPctSeries.at(-1); const atrPctPerc=percentileRank(atrPctSeries.slice(-252), atrPct);
 
-  // BB width percentile (20,2)
-  const BBwidthSeries=closes.map((_,i)=>{
-    if(i<19) return NaN; const win=closes.slice(i-19,i+1); const m=mean(win), sd=stdev(win);
-    return (sd>0&&m>0)? (4*sd/m):NaN;
-  }).filter(Number.isFinite);
+  const BBwidthSeries=closes.map((_,i)=>{ if(i<19) return NaN; const win=closes.slice(i-19,i+1); const m=mean(win), sd=stdev(win); return (sd>0&&m>0)? (4*sd/m):NaN; }).filter(Number.isFinite);
   const bbWidth=BBwidthSeries.at(-1); const bbPerc=percentileRank(BBwidthSeries.slice(-252), bbWidth);
 
-  // NR7/NR4 cluster
   const ranges=rows.map(r=>r.high-r.low);
   function countNRn(n){ let c=0; for(let i=rows.length-10;i<rows.length;i++){ if(i<0) continue; const win=ranges.slice(i-n+1,i+1); if(win.length===n && ranges[i]===Math.min(...win)) c++; } return c; }
-  const nr7=countNRn(7), nr4=countNRn(4); const hasNRcluster=(nr7>=2)||(nr4>=2);
+  const hasNRcluster=(countNRn(7)>=2)||(countNRn(4)>=2);
 
-  // Up/Down vol ratio (10) with flat price ±3%
   let upVol=0,downVol=0; for(let i=rows.length-10;i<rows.length;i++){ if(i<=0) continue; const up=closes[i]>closes[i-1]; if(up) upVol+=vols[i]; else downVol+=vols[i]; }
   const udRatio=(downVol>0)? upVol/downVol:0; const d10=closes.at(-1)/closes.at(-11)-1; const flat10=Math.abs(d10)<=0.03;
 
-  // OBV slope (20)
   let obv=[0]; for(let i=1;i<rows.length;i++){ const sign=closes[i]>closes[i-1]?1:(closes[i]<closes[i-1]?-1:0); obv.push(obv[i-1]+sign*vols[i]); }
   const obvSlope20=(function(){ const s=obv.slice(-20); if(s.length<2) return 0; const n=s.length; const x=Array.from({length:n},(_,i)=>i+1); const sx=x.reduce((a,b)=>a+b,0), sy=s.reduce((a,b)=>a+b,0); const sxx=x.reduce((a,b)=>a+b*b,0); const sxy=x.reduce((a,i)=>a+i*s[i-1],0); const denom=n*sxx-sx*sx; return Math.abs(denom)<1e-9?0:(n*sxy-sx*sy)/denom; })();
 
-  // Pocket Pivot in last 3
   let ppivot=false; for(let k=rows.length-3;k<rows.length;k++){ if(k<=0) continue; const up=closes[k]>closes[k-1]; const winStart=Math.max(0,k-10); const downVols=[]; for(let j=winStart;j<k;j++){ if(closes[j]<closes[j-1]) downVols.push(vols[j]); } const maxDown=downVols.length?Math.max(...downVols):0; if(up && vols[k]>maxDown && closes[k]>sma(closes.slice(0,k+1),10)){ ppivot=true; break; } }
 
-  // RS vs benchmark
   const bc=benchRows.map(r=>r.close); const minLen=Math.min(closes.length, bc.length);
   const ratio=closes.slice(-minLen).map((c,i)=> c / bc.slice(-minLen)[i]);
   const rsSlope10=(function(){ const s=ratio.slice(-10); if(s.length<2) return 0; const n=s.length; const x=Array.from({length:n},(_,i)=>i+1); const sx=x.reduce((a,b)=>a+b,0), sy=s.reduce((a,b)=>a+b,0); const sxx=x.reduce((a,b)=>a+b*b,0); const sxy=x.reduce((a,i)=>a+i*s[i-1],0); const denom=n*sxx-sx*sx; return Math.abs(denom)<1e-9?0:(n*sxy-sx*sy)/denom; })();
   const rsPerc=percentileRank(ratio.slice(-60), ratio.at(-1));
 
-  // Location
   const last=closes.at(-1); const high30=Math.max(...closes.slice(-30)); const distHigh=last/high30-1;
   const sma50now=sma(closes,50); const sma50old=sma(closes.slice(0,-10),50); const ma50Rising=(sma50now && sma50old)?(sma50now>sma50old):false; const nearMA50=(last>sma50now)&&((last/sma50now-1)<=0.05);
 
@@ -309,33 +222,28 @@ function computePreBreakout(rows, benchRows){
   return {score, detail:{SQUEEZE,ACCUM,LEAD,LOC}};
 }
 
-/* =========================
-   UI BUILD / RENDER
-   ========================= */
-const grid=document.getElementById('grid');
-let benchCache=null;
+/* ===== UI ===== */
+const grid=document.getElementById('grid'); let benchCache=null;
 
 async function getBenchmarkRows(){
-  if(benchCache && (Date.now()-benchCache.t<CACHE_TTL_MS)) return benchCache.rows;
+  if(benchCache && (Date.now()-benchCache.t<10*60*1000)) return benchCache.rows;
   const rows=await fetchYahooChart(BENCHMARK,Y_RANGE,Y_INTERVAL);
   benchCache={rows,t:Date.now()}; return rows;
 }
+function tag(ok,label,mid=false){ return `<span class="pill ${ok?'ok':(mid?'warn':'no')}">${label}</span>`; }
 
 function buildRow(item){
   const rid=rowIdFromSymbol(item.symbol);
   const row=document.createElement('div'); row.className='row'; row.id=rid;
 
-  // LEFT
   const left=document.createElement('div'); left.className='card';
   left.innerHTML=`<h2>${item.name} — Price & Chart</h2><div id="${cid(rid,'tv')}" style="height:400px"></div>`;
   row.appendChild(left);
 
-  // MIDDLE
   const mid=document.createElement('div'); mid.className='card';
   mid.innerHTML=`<h2>Google Trends — “${item.trendTerm}” (1m, Worldwide)</h2><div id="${cid(rid,'trends')}" style="height:360px"></div>`;
   row.appendChild(mid);
 
-  // RIGHT
   const right=document.createElement('div'); right.className='card';
   const remove=document.createElement('button'); remove.className='remove-btn'; remove.textContent='Remove';
   remove.addEventListener('click',()=>removeStock(item.symbol));
@@ -360,50 +268,43 @@ function buildRow(item){
   fillRowData(item);
 }
 
-function tag(ok,label,mid=false){ return `<span class="pill ${ok?'ok':(mid?'warn':'no')}">${label}</span>`; }
+function renderSparkAndTags(rid, rows, brow, scoreDetail, score){
+  renderSparkline(document.getElementById(cid(rid,'spark')), rows.slice(-30).map(r=>r.close));
+  const sEl=document.getElementById(cid(rid,'score'));
+  if(sEl){
+    let cls='bad', badge='C';
+    if(score>=70){ cls='good'; badge='A'; }
+    else if(score>=55){ cls='mid'; badge='B'; }
+    sEl.className='score '+cls; sEl.textContent=score.toFixed(0);
+    sEl.insertAdjacentHTML('beforeend',` <span class="badge">${badge}</span>`);
+  }
+  const d=scoreDetail||{};
+  const sq=document.getElementById(cid(rid,'sq-tags'));
+  if(sq) sq.innerHTML=[ tag(d?.SQUEEZE?.atrLow,'ATR% low'), tag(d?.SQUEEZE?.bbLow,'BB width low'), tag(d?.SQUEEZE?.nrx,'NR7/NR4 cluster') ].join(' ');
+  const ac=document.getElementById(cid(rid,'ac-tags'));
+  if(ac) ac.innerHTML=[ tag(d?.ACCUM?.udOK,'Up/Down≥1.2 (flat)',true), tag(d?.ACCUM?.obvUp,'OBV↑'), tag(d?.ACCUM?.pivot,'Pocket Pivot') ].join(' ');
+  const ld=document.getElementById(cid(rid,'ld-tags'));
+  if(ld) ld.innerHTML=[ tag(d?.LEAD?.rsUp,'RS slope↑'), tag(d?.LEAD?.rsTop,'RS top 25%') ].join(' ');
+  const lo=document.getElementById(cid(rid,'lo-tags'));
+  if(lo) lo.innerHTML=[ tag(d?.LOC?.nearHigh,'2–8% under 30-high'), tag(d?.LOC?.ma50OK,'50-DMA rising & above') ].join(' ');
+}
 
 async function fillRowData(item){
   const rid=rowIdFromSymbol(item.symbol);
   try{
-    const [rows, brow]=await Promise.all([
-      fetchYahooChart(yTicker(item.symbol), Y_RANGE, Y_INTERVAL),
+    const [rows,brow]=await Promise.all([
+      fetchYahooChart(yTicker(item.symbol),Y_RANGE,Y_INTERVAL),
       getBenchmarkRows()
     ]);
-
-    renderSparkline(document.getElementById(cid(rid,'spark')), rows.slice(-30).map(r=>r.close));
-
     const pb=computePreBreakout(rows,brow);
-    const sEl=document.getElementById(cid(rid,'score'));
-    if(sEl){
-      let cls='bad', badge='C';
-      if(pb.score>=70){ cls='good'; badge='A'; }
-      else if(pb.score>=55){ cls='mid'; badge='B'; }
-      sEl.className='score '+cls; sEl.textContent=pb.score.toFixed(0);
-      sEl.insertAdjacentHTML('beforeend',` <span class="badge">${badge}</span>`);
-    }
-    const d=pb.detail||{};
-    const sq=document.getElementById(cid(rid,'sq-tags'));
-    if(sq) sq.innerHTML=[ tag(d?.SQUEEZE?.atrLow,'ATR% low'), tag(d?.SQUEEZE?.bbLow,'BB width low'), tag(d?.SQUEEZE?.nrx,'NR7/NR4 cluster') ].join(' ');
-    const ac=document.getElementById(cid(rid,'ac-tags'));
-    if(ac) ac.innerHTML=[ tag(d?.ACCUM?.udOK,'Up/Down≥1.2 (flat)',true), tag(d?.ACCUM?.obvUp,'OBV↑'), tag(d?.ACCUM?.pivot,'Pocket Pivot') ].join(' ');
-    const ld=document.getElementById(cid(rid,'ld-tags'));
-    if(ld) ld.innerHTML=[ tag(d?.LEAD?.rsUp,'RS slope↑'), tag(d?.LEAD?.rsTop,'RS top 25%') ].join(' ');
-    const lo=document.getElementById(cid(rid,'lo-tags'));
-    if(lo) lo.innerHTML=[ tag(d?.LOC?.nearHigh,'2–8% under 30-high'), tag(d?.LOC?.ma50OK,'50-DMA rising & above') ].join(' ');
-
+    renderSparkAndTags(rid, rows, brow, pb.detail, pb.score);
     const row=document.getElementById(rid); if(row) row.dataset.score=String(pb.score||0);
   }catch(e){
     console.error('calc error', item.symbol, e);
     const row=document.getElementById(rid); if(row) row.dataset.score='0';
-    ['sq-tags','ac-tags','ld-tags','lo-tags','spark','score','news'].forEach(k=>{
-      const el=document.getElementById(`${k}-${rid}`); if(!el) return;
-      if(k==='score'){ el.textContent='—'; el.className='score'; }
-      else if(k==='news'){ el.innerHTML = `<h3>Latest News</h3><div style="color:var(--muted)">—</div>`; }
-      else el.innerHTML='';
-    });
   }
 
-  // News (don’t block the row)
+  // News (non-blocking)
   try{
     const q=`${yTicker(item.symbol)} stock OR ${item.name.replace(/\(.*?\)/g,'').trim()} stock`;
     const items=await fetchNewsItems(q);
@@ -429,18 +330,12 @@ function sortRowsLive(){
   rows.forEach(r=>grid.appendChild(r));
 }
 
-/* =========================
-   ACTIONS
-   ========================= */
 function updateTimestamp(){
   const el=document.getElementById('last-updated'); if(!el) return;
   el.textContent='Last updated: '+new Date().toLocaleTimeString(); el.style.color='var(--good)'; setTimeout(()=>el.style.color='var(--muted)',1200);
 }
-function renderAll(){
-  grid.innerHTML=''; benchCache=null; // re-fetch QQQ once
-  getWatchlist().forEach(it=>buildRow(it));
-  sortRowsLive(); updateTimestamp();
-}
+function renderAll(){ grid.innerHTML=''; benchCache=null; getWatchlist().forEach(it=>buildRow(it)); sortRowsLive(); updateTimestamp(); }
+
 function addOrUpdate(){
   const s=document.getElementById('in-symbol').value.trim();
   const n=document.getElementById('in-name').value.trim()||s;
@@ -452,10 +347,7 @@ function addOrUpdate(){
   document.getElementById('in-symbol').value=''; document.getElementById('in-name').value=''; document.getElementById('in-trend').value='';
   renderAll();
 }
-function removeStock(symbol){
-  const key=yTicker(symbol);
-  const list=getWatchlist().filter(x=>yTicker(x.symbol)!==key); setWatchlist(list); renderAll();
-}
+function removeStock(symbol){ const key=yTicker(symbol); const list=getWatchlist().filter(x=>yTicker(x.symbol)!==key); setWatchlist(list); renderAll(); }
 function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
 
 document.getElementById('btn-add').addEventListener('click', addOrUpdate);
@@ -463,7 +355,6 @@ document.getElementById('btn-reset').addEventListener('click', resetDefaults);
 document.getElementById('btn-refresh').addEventListener('click', renderAll);
 document.getElementById('sortby').addEventListener('change', sortRowsLive);
 
-/* boot */
 renderAll();
 setInterval(renderAll, AUTO_REFRESH_MS);
 </script>
