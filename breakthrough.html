@@ -165,7 +165,7 @@ if (m) {
       const evs=d.defaultKeyStatistics?.enterpriseToRevenue?.raw ?? d.financialData?.enterpriseToRevenue?.raw ?? null;
       const mcap=d.price?.marketCap?.fmt ?? (d.price?.marketCap?.raw? `$${Math.round(d.price.marketCap.raw/1e9)}B` : null);
       return { pe, ps, evs, mcap }; } catch { return null; }
-  }?modules=price,summaryDetail,defaultKeyStatistics,financialData`;
+  }modules=price,summaryDetail,defaultKeyStatistics,financialData`;
     try{ const r=await fetch(url); if(!r.ok) return null; const j=await r.json(); const d=j?.quoteSummary?.result?.[0]; if(!d) return null;
       const pe=d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null;
       const ps=d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null;
