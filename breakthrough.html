@@ -62,13 +62,7 @@
           <input id="fngInput" type="range" min="0" max="100" value="50" />
         </div>
         <div class="control"><label for="range">Chart range</label>
-          <select id="range">
-            <option value="1M">1M</option>
-            <option value="3M">3M</option>
-            <option value="6M">6M</option>
-            <option value="12M" selected>12M</option>
-            <option value="ALL">ALL</option>
-          </select>
+          <select id="range"><option value="1M">1M</option><option value="3M">3M</option><option value="6M">6M</option><option value="12M" selected>12M</option><option value="ALL">ALL</option></select>
         </div>
         <div class="control"><label for="geo">Trends Geo</label>
           <select id="geo"><option value="US" selected>US</option><option value="">Worldwide</option></select>
@@ -94,9 +88,11 @@
       { ticker:'PLTR', name:'Palantir', exchange:'NYSE', trendsQuery:'Palantir' },
       { ticker:'QSI', name:'Quantum-Si', exchange:'NASDAQ', trendsQuery:'Quantum-Si' },
       { ticker:'APLD', name:'Applied Digital', exchange:'NASDAQ', trendsQuery:'Applied Digital' },
+      { ticker:'INOD', name:'Innodata', exchange:'NASDAQ', trendsQuery:'Innodata' },
+      { ticker:'NVDA', name:'NVIDIA', exchange:'NASDAQ', trendsQuery:'NVIDIA' }
     ];
 
-    const state={ rows:[], range:'12M', geo:'US', trendTime:'today 1-m' };
+    const state={ rows:[], range:'12M', geo:'US', trendTime:'today 1-m', cache:{} };
 
     // --- Fear/Greed gauge (manual) ---
     const fngInput=document.getElementById('fngInput');
@@ -107,11 +103,9 @@
     fngInput.addEventListener('input',e=>setFNG(+e.target.value));
 
     // --- Helpers ---
-    function tvMiniConfig(ticker){ return { symbol:ticker, width:'100%', height:240, locale:'en', dateRange:state.range, colorTheme:'dark', isTransparent:true, autosize:true, largeChartUrl:`https://www.tradingview.com/symbols/${ticker}/`, noTimeScale:false }; }
+    function tvMiniConfig(ticker){ return { symbol:ticker, width:'100%', height:320, locale:'en', dateRange:state.range, colorTheme:'dark', isTransparent:true, autosize:true, largeChartUrl:`https://www.tradingview.com/symbols/${ticker}/`, noTimeScale:false }; }/`, noTimeScale:false }; }
 
-    function trendSrc(query){
-      // Use the official TIMESERIES embed that Google Trends uses internally
-      const req={ comparisonItem:[{ keyword: query, geo: state.geo, time: state.trendTime }], category:0 };
+    function trendSrc(query){ const req={ comparisonItem:[{ keyword: query, geo: state.geo, time: state.trendTime }], category:0 }; const tz=-new Date().getTimezoneOffset(); const base='https://trends.google.com/trends/embed/explore/TIMESERIES'; const params=new URLSearchParams({ hl:'en-US', req: JSON.stringify(req), tz: String(tz) }); return `${base}?${params.toString()}`; }], category:0 };
       const tz=-new Date().getTimezoneOffset();
       const base='https://trends.google.com/trends/embed/explore/TIMESERIES';
       const params=new URLSearchParams({ hl:'en-US', req: JSON.stringify(req), tz: String(tz) });
@@ -123,17 +117,19 @@
       const left=document.createElement('div'); left.className='cell sym';
       left.innerHTML=`
         <div><div class="ticker">${stock.ticker}</div><div class="name">${stock.name}</div></div>
-        <div class="chips"><span class="chip">${stock.exchange}</span><span class="chip">Trends: ${stock.trendsQuery||stock.name}</span></div>
+        <div class="chips" data-chips><span class="chip">${stock.exchange}</span><span class="chip">Trends: ${stock.trendsQuery||stock.name}</span></div>
         <div class="actions"><button class="ghost" data-remove>Remove</button></div>`;
 
       const mid=document.createElement('div'); mid.className='cell trends';
-      const tFrame=document.createElement('iframe'); tFrame.loading='lazy'; tFrame.title=`${stock.trendsQuery||stock.name} — Google Trends`; tFrame.src=trendSrc(stock.trendsQuery||stock.name); mid.appendChild(tFrame);
+      const scaleWrap=document.createElement('div'); scaleWrap.className='scaleWrap';
+      const tFrame=document.createElement('iframe'); tFrame.loading='lazy'; tFrame.title=`${stock.trendsQuery||stock.name} — Google Trends`; tFrame.src=trendSrc(stock.trendsQuery||stock.name);
+      scaleWrap.appendChild(tFrame); mid.appendChild(scaleWrap);
 
       const right=document.createElement('div'); right.className='cell mini';
       const tvbox=document.createElement('div'); tvbox.className='tvbox'; right.appendChild(tvbox);
       const chips=document.createElement('div'); chips.className='vals'; right.appendChild(chips);
 
-      // Value chip placeholder (kept from earlier design)
+      // valuation chips placeholder
       const scoreEl=document.createElement('span'); scoreEl.className='chip score'; scoreEl.textContent='Value —'; chips.appendChild(scoreEl);
 
       // Mount TradingView mini chart lazily
@@ -143,7 +139,11 @@
       row.appendChild(left); row.appendChild(mid); row.appendChild(right);
       table.appendChild(row);
 
-      state.rows.push({ el:row, data:stock, tvbox, tFrame, scoreEl });
+      const res={ el:row, data:stock, tvbox, tFrame, scoreEl };
+      state.rows.push(res);
+      // Fetch live valuation
+      fetchValuation(stock.ticker).then(v=>{ if(!v) return; state.cache[stock.ticker]=v; renderValuationChips(res, v); });
+    }
     }
 
     function lazyMountMiniChart(container,symbol){
@@ -173,15 +173,52 @@
     document.getElementById('range').addEventListener('change',e=>{
       state.range=e.target.value; // re-render each chart widget
       state.rows.forEach(r=>{ r.tvbox.innerHTML=''; r.tvbox.removeAttribute('data-mounted'); lazyMountMiniChart(r.tvbox, `${r.data.exchange}:${r.data.ticker}`); });
+    });('change',e=>{
+      state.range=e.target.value; // re-render each chart widget
+      state.rows.forEach(r=>{ r.tvbox.innerHTML=''; r.tvbox.removeAttribute('data-mounted'); lazyMountMiniChart(r.tvbox, `${r.data.exchange}:${r.data.ticker}`); });
     });
 
     document.getElementById('geo').addEventListener('change',e=>{ state.geo=e.target.value; refreshTrends(); });
     document.getElementById('trendTime').addEventListener('change',e=>{ state.trendTime=e.target.value; refreshTrends(); });
 
-    function refreshTrends(){ state.rows.forEach(r=>{ r.tFrame.src=trendSrc(r.data.trendsQuery||r.data.name); }); }
+    function refreshTrends(){ state.rows.forEach(r=>{ r.tFrame.src=trendSrc(r.data.trendsQuery||r.data.name); }); }); }
 
     // --- Init ---
     WATCHLIST.forEach(makeRow);
+  // --- Fear/Greed live fetch (best-effort) ---
+    async function fetchFearGreed(){
+      // Try CNN endpoint first (may be blocked by CORS in some regions)
+      try{
+        const r=await fetch('https://production.dataviz.cnn.io/index/fearandgreed/score');
+        if(r.ok){ const j=await r.json(); const v=Number(j?.fear_and_greed?.score ?? j?.score); if(Number.isFinite(v)) return {value:v, source:'CNN'}; }
+      }catch{}
+      // Fallback: Crypto Fear & Greed (Alternative.me) — CORS friendly
+      try{
+        const r=await fetch('https://api.alternative.me/fng/?limit=1&format=json');
+        if(r.ok){ const j=await r.json(); const v=Number(j?.data?.[0]?.value); if(Number.isFinite(v)) return {value:v, source:'Crypto FNG'}; }
+      }catch{}
+      return null;
+    }
+    (async()=>{ const res=await fetchFearGreed(); if(res){ document.getElementById('gauge').style.setProperty('--v',res.value); document.getElementById('needle').style.transform=`rotate(${ -90 + (res.value*1.8) }deg)`; document.getElementById('fngVal').textContent=`${res.value} (${res.source})`; } })();
+
+    // --- Live valuation (Yahoo Finance quoteSummary; may fail if YF blocks CORS) ---
+    async function fetchValuation(ticker){
+      const url=`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price,summaryDetail,defaultKeyStatistics,financialData`; 
+      try{
+        const r=await fetch(url); if(!r.ok) return null; const j=await r.json(); const d=j?.quoteSummary?.result?.[0]; if(!d) return null;
+        const pe = d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null;
+        const ps = d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null;
+        const evs = d.defaultKeyStatistics?.enterpriseToRevenue?.raw ?? d.financialData?.enterpriseToRevenue?.raw ?? null;
+        const mcap = d.price?.marketCap?.fmt ?? (d.price?.marketCap?.raw? `$${Math.round(d.price.marketCap.raw/1e9)}B` : null);
+        return { pe, ps, evs, mcap };
+      }catch{ return null; }
+    }
+    function renderValuationChips(rowRef, v){
+      const chipsWrap=rowRef.el.querySelector('[data-chips]');
+      chipsWrap.querySelectorAll('.chip').forEach((c,i)=>{ /* leave first two chips */ });
+      const add=(label,val)=>{ if(val==null) return; const s=document.createElement('span'); s.className='chip'; s.textContent=`${label}: ${typeof val==='number'? Number(val.toFixed(2)) : val}`; chipsWrap.appendChild(s); };
+      add('MCap', v.mcap); add('P/E', v.pe); add('P/S', v.ps); add('EV/S', v.evs);
+    }
   </script>
 </body>
 </html>
