@@ -139,12 +139,18 @@
   async function fetchFearGreed(){
     // Try CNN Fear & Greed page via CORS-friendly reader
     try{
-      const url='https://r.jina.ai/http://edition.cnn.com/markets/fear-and-greed';
-      const html=await (await fetch(url)).text();
-      const m = (new RegExp("dial-number[^>]*>(\d{1,3})","i").exec(html)) ||
-                (new RegExp("Fear\s*&\s*Greed[^\d]*(\d{1,3})","i").exec(html)) ||
-                (new RegExp("\\"score\\"\s*:\s*(\d{1,3})","i").exec(html));
-      if(m){ const v=Math.max(0,Math.min(100,parseInt(m[1],10))); return {value:v, source:'CNN'}; }
+      const url = 'https://r.jina.ai/http://edition.cnn.com/markets/fear-and-greed';
+const html = await (await fetch(url)).text();
+
+const m =
+  /dial-number[^>]*>(\d{1,3})/i.exec(html) ||
+  /Fear\s*&\s*Greed[^\d]*(\d{1,3})/i.exec(html) ||
+  /"score"\s*:\s*(\d{1,3})/i.exec(html);
+
+if (m) {
+  const v = Math.max(0, Math.min(100, parseInt(m[1], 10)));
+  return { value: v, source: 'CNN' };
+}
     }catch(e){}
     // Fallback: stock composite (VIX + ^CPC)
     try{ const alt=await fetchFGStockComposite(); if(alt) return alt; }catch(e){}
