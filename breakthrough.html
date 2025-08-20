@@ -50,7 +50,7 @@
   ];
 
   const state={ rows:[], range:'12M', geo:'US', trendTime:'today 1-m' };
-  const table = document.getElementById('table');
+const table = document.getElementById('table');
 
   const fngVal=document.getElementById('fngVal');
   const needle=document.getElementById('needle');
@@ -81,7 +81,7 @@
     left.innerHTML=`
         <div><div class="ticker">${stock.ticker}</div><div class="name">${stock.name}</div></div>
         <div class="chips" data-chips><span class="chip">${stock.exchange}</span><span class="chip">Trends: ${stock.trendsQuery||stock.name}</span></div>
-        <div class="metrics" data-metrics></div>
+        <div class="metrics" data-metrics><div>Loading...</div></div>
         <div class="actions"><button class="ghost" data-remove>Remove</button></div>`;
 
     const mid=document.createElement('div'); mid.className='cell trends';
@@ -95,7 +95,7 @@
     table.appendChild(row);
 
     lazyMountMiniChart(tvbox, `${stock.exchange}:${stock.ticker}`);
-    fetchValuation(stock.ticker).then(v=>{ if(!v) return; renderValuation(left, v); });
+    fetchValuation(stock.ticker).then(v=>{ if(v) renderValuation(left, v); else left.querySelector('[data-metrics]').innerHTML='<div>n/a</div>'; });
 
     state.rows.push({ el:row, data:stock, tFrame, tvbox });
   }
@@ -139,65 +139,58 @@
 
   async function fetchFearGreed(){
     try{
-    const url = 'https://r.jina.ai/http://edition.cnn.com/markets/fear-and-greed';
-const html = await (await fetch(url)).text();
-
-const m =
-  /dial-number[^>]*>(\d{1,3})/i.exec(html) ||
-  /Fear\s*&\s*Greed[^\d]*(\d{1,3})/i.exec(html) ||
-  /"score"\s*:\s*(\d{1,3})/i.exec(html);
-
-if (m) {
-  const v = Math.max(0, Math.min(100, parseInt(m[1], 10)));
-  return { value: v, source: 'CNN' };
-}
-
-    }catch(e){}
-    try{ const alt=await fetchFGStockComposite(); if(alt) return alt; }catch(e){}
+      const url = 'https://r.jina.ai/http://edition.cnn.com/markets/fear-and-greed';
+      const html = await (await fetch(url)).text();
+      const m =
+        /dial-number[^>]*>(\d{1,3})/i.exec(html) ||
+        /Fear\s*&\s*Greed[^\d]*(\d{1,3})/i.exec(html) ||
+        /\"score\"\s*:\s*(\d{1,3})/i.exec(html);
+      if (m) {
+        const v = Math.max(0, Math.min(100, parseInt(m[1], 10)));
+        return { value: v, source: 'CNN' };
+      }
+    }catch(e){ console.error('FNG fetch error',e); }
+    try{ const alt=await fetchFGStockComposite(); if(alt) return alt; }catch(e){ console.error('Alt FNG error',e); }
     return null;
   }
 
- async function fetchValuation(ticker) {
-  const url = `https://r.jina.ai/http://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price,summaryDetail,defaultKeyStatistics,financialData`;
-  try {
-    const txt = await (await fetch(url)).text();        // CORS-safe via reader
-    const j = JSON.parse(txt);
-    const d = j?.quoteSummary?.result?.[0];
-    if (!d) return null;
-
-    const pe  = d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null;
-    const ps  = d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null;
-    const evs = d.defaultKeyStatistics?.enterpriseToRevenue?.raw ?? d.financialData?.enterpriseToRevenue?.raw ?? null;
-    const mcap = d.price?.marketCap?.fmt ?? (
-      d.price?.marketCap?.raw ? `$${Math.round(d.price.marketCap.raw / 1e9)}B` : null
-    );
-
-    return { pe, ps, evs, mcap };
-  } catch {
-    return null;
+  async function fetchValuation(ticker){
+    const url=`https://r.jina.ai/http://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price,summaryDetail,defaultKeyStatistics,financialData`;
+    try{
+      const r=await fetch(url);
+      if(!r.ok) return null;
+      const txt=await r.text();
+      const j=JSON.parse(txt);
+      const d=j?.quoteSummary?.result?.[0];
+      if(!d) return null;
+      const pe=d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null;
+      const ps=d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null;
+      const evs=d.defaultKeyStatistics?.enterpriseToRevenue?.raw ?? d.financialData?.enterpriseToRevenue?.raw ?? null;
+      const mcap=d.price?.marketCap?.fmt ?? (d.price?.marketCap?.raw? `$${Math.round(d.price.marketCap.raw/1e9)}B` : null);
+      return { pe, ps, evs, mcap };
+    } catch(e) {
+      console.error('Val fetch error', e);
+      return null;
+    }
   }
-}
 
-
-function renderValuation(left, v) {
-  const m = left.querySelector('[data-metrics]');
-  if (!m) return;
-
-  m.innerHTML = '';
-  const add = (k, val) => {
-    if (val == null) return;
-    const d = document.createElement('div');
-    d.style.display = 'flex';
-    d.style.justifyContent = 'space-between';
-    d.innerHTML = `<span>${k}</span><b>${typeof val === 'number' ? Number(val.toFixed(2)) : val}</b>`;
-    m.appendChild(d);
-  };
-
-  add('MCap', v.mcap);
-  add('P/E', v.pe);
-  add('P/S', v.ps);
-  add('EV/S', v.evs);
-}
+  function renderValuation(left, v){
+    const m=left.querySelector('[data-metrics]');
+    if(!m) return;
+    m.innerHTML='';
+    const add=(k,val)=>{
+      if(val==null) return;
+      const d=document.createElement('div');
+      d.style.display='flex';
+      d.style.justifyContent='space-between';
+      d.innerHTML=`<span>${k}</span><b>${typeof val==='number'? Number(val.toFixed(2)) : val}</b>`;
+      m.appendChild(d);
+    };
+    add('MCap', v.mcap);
+    add('P/E', v.pe);
+    add('P/S', v.ps);
+    add('EV/S', v.evs);
+  }
 
   WATCHLIST.forEach(makeRow);
 
