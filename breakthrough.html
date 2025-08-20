@@ -106,15 +106,29 @@
     }
     function clamp01(x){ return Math.max(0, Math.min(1, x)); }
     function scaleToScore(x, min, max, invert=false){ const p=clamp01((x-min)/(max-min)); const v=invert? (1-p):p; return Math.round(v*100); }
-    async function fetchFGStock(){
-      const [vix,pcr]=await Promise.all([lastClose('^VIX'), lastClose('^CPC')]);
-      const vixScore=Number.isFinite(vix)? scaleToScore(vix,12,40,true):null; // higher vix => lower score
-      const pcrScore=Number.isFinite(pcr)? scaleToScore(pcr,0.7,1.3,true):null; // higher pcr => lower score
-      const parts=[vixScore,pcrScore].filter(n=>Number.isFinite(n));
-      if(!parts.length) return null;
-      const score=Math.round(parts.reduce((a,b)=>a+b,0)/parts.length);
-      return {value:score, source:'stock composite'};
-    }
+   (async()=>{ const res=await fetchFGStockComposite(); if(res){ setFNG(res.value, res.source); } })();
+
+async function fetchFGStockComposite(){
+  async function lastClose(symbol){
+    try{
+      const url=`https://r.jina.ai/http://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+      const t=await (await fetch(url)).text();
+      const j=JSON.parse(t);
+      const arr=j?.chart?.result?.[0]?.indicators?.quote?.[0]?.close||[];
+      const v=arr.filter(x=>Number.isFinite(x)).slice(-1)[0];
+      return Number(v);
+    }catch{return null}
+  }
+  const [vix,pcr]=await Promise.all([ lastClose('^VIX'), lastClose('^CPC') ]);
+  if(!Number.isFinite(vix) && !Number.isFinite(pcr)) return null;
+  const norm=(x,min,max)=>Math.max(0,Math.min(100,100*(1-(x-min)/(max-min))));
+  const vixScore=Number.isFinite(vix)? norm(vix,12,40):null;
+  const pcrScore=Number.isFinite(pcr)? norm(pcr,0.7,1.3):null;
+  const parts=[vixScore,pcrScore].filter(n=>Number.isFinite(n));
+  const val=Math.round(parts.reduce((a,b)=>a+b,0)/parts.length);
+  return { value: val, source: 'stock composite' };
+}
+
     function setFNG(v,src){ document.getElementById('gauge').style.setProperty('--v',v); document.getElementById('needle').style.transform=`rotate(${ -90 + (v*1.8) }deg)`; document.getElementById('fngVal').textContent=String(v); if(src) document.getElementById('fngSrc').textContent=`(${src})`; }
     (async()=>{ const r=await fetchFGStock(); if(r) setFNG(r.value,r.source); })();
 
@@ -158,7 +172,7 @@
       const res={ el:row, data:stock, tvbox, tFrame };
       state.rows.push(res);
       // Fetch valuation -> chips + metrics
-      fetchValuation(stock.ticker).then(v=>{ if(!v) return; renderValuation(res,v); });
+fetchValuation(stock.ticker).then(v=>{ if(!v) return; renderValuation(left, v); });
     }
 
     function lazyMountMiniChart(container,symbol){ const mount=()=>{ if(container.dataset.mounted) return; container.dataset.mounted='1'; addTVMini(container, symbol); }; const io=new IntersectionObserver((entries)=>{ entries.forEach(e=>{ if(e.isIntersecting){ mount(); io.disconnect(); } }); },{rootMargin:'200px'}); io.observe(container); }
@@ -166,7 +180,23 @@
 
     // --- Valuation via Yahoo Finance (CORS proxy) ---
     async function fetchValuation(ticker){ const url=`https://r.jina.ai/http://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price,summaryDetail,defaultKeyStatistics,financialData`; try{ const r=await fetch(url); if(!r.ok) return null; const txt=await r.text(); const j=JSON.parse(txt); const d=j?.quoteSummary?.result?.[0]; if(!d) return null; const pe=d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null; const ps=d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null; const evs=d.defaultKeyStatistics?.enterpriseToRevenue?.raw ?? d.financialData?.enterpriseToRevenue?.raw ?? null; const mcap=d.price?.marketCap?.fmt ?? (d.price?.marketCap?.raw? `$${Math.round(d.price.marketCap.raw/1e9)}B` : null); return {pe,ps,evs,mcap}; }catch{return null} }
-    function renderValuation(rowRef,v){ const wrap=rowRef.el.querySelector('[data-chips]'); const addChip=(k,val)=>{ if(val==null) return; const s=document.createElement('span'); s.className='chip'; s.textContent=`${k}: ${typeof val==='number'? Number(val.toFixed(2)) : val}`; wrap.appendChild(s); }; addChip('MCap',v.mcap); addChip('P/E',v.pe); addChip('P/S',v.ps); addChip('EV/S',v.evs); const m=rowRef.el.querySelector('[data-metrics]'); if(m){ const fmt=(x)=> typeof x==='number'? Number(x.toFixed(2)) : x; m.innerHTML=''; const add=(k,val)=>{ if(val==null) return; const d=document.createElement('div'); d.style.display='flex'; d.style.justifyContent='space-between'; d.innerHTML=`<span>${k}</span><b>${fmt(val)}</b>`; m.appendChild(d); }; add('MCap',v.mcap); add('P/E',v.pe); add('P/S',v.ps); add('EV/S',v.evs); } }
+function renderValuation(left, v){
+  const chips=left.querySelector('.chips');
+  const addChip=(label,val)=>{ if(val==null) return; const s=document.createElement('span'); s.className='chip';
+    s.textContent=`${label}: ${typeof val==='number'? Number(val.toFixed(2)) : val}`; chips.appendChild(s); };
+  addChip('MCap', v.mcap); addChip('P/E', v.pe); addChip('P/S', v.ps); addChip('EV/S', v.evs);
+
+  const m=left.querySelector('[data-metrics]');
+  if(m){
+    const fmt=(x)=> typeof x==='number'? Number(x.toFixed(2)) : x;
+    m.innerHTML='';
+    const add=(k,val)=>{ if(val==null) return; const d=document.createElement('div');
+      d.style.display='flex'; d.style.justifyContent='space-between';
+      d.innerHTML=`<span>${k}</span><b>${fmt(val)}</b>`; m.appendChild(d); };
+    add('MCap', v.mcap); add('P/E', v.pe); add('P/S', v.ps); add('EV/S', v.evs);
+  }
+}
+
 
     // --- Controls ---
     document.getElementById('table').addEventListener('click',(e)=>{ const btn=e.target.closest('[data-remove]'); if(!btn) return; const row=btn.closest('.row'); const sym=row.querySelector('.ticker')?.textContent.trim(); row.remove(); state.rows=state.rows.filter(r=>r.data.ticker!==sym); });
