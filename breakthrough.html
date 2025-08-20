@@ -7,7 +7,7 @@
   <style>
     :root{--bg:#0b0f14;--panel:#131a22;--panel-2:#0f151c;--text:#e6edf3;--muted:#a5b1bf;--accent:#3ea6ff;--good:#18b663;--bad:#ff4d4f;--chip:#1b2430;--border:#243040}
     html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji"}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
     header{position:sticky;top:0;z-index:10;backdrop-filter:blur(6px);background:linear-gradient(180deg,rgba(11,15,20,.9),rgba(11,15,20,.6));border-bottom:1px solid var(--border)}
     .wrap{max-width:1300px;margin:0 auto;padding:14px 16px}
     h1{font-size:20px;margin:0 0 8px;letter-spacing:.3px}
@@ -17,8 +17,14 @@
     select,input[type=text]{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;outline:none}
     button{background:var(--accent);color:#071018;border:none;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}
     button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+
+    .fng{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);background:var(--panel);border-radius:10px}
+    .gauge{--v:50;width:160px;height:80px;background:conic-gradient(#ff4d4f calc(var(--v)*1%),#ffd166 0 calc(50*1%),#18b663 0);mask:radial-gradient(80px at 50% 100%,transparent 79px,#000 80px);border-radius:0 0 160px 160px;position:relative}
+    .needle{position:absolute;left:50%;bottom:0;width:2px;height:78px;background:#e6edf3;transform-origin:bottom center;transform:rotate(calc(-90deg + (var(--v)*1.8deg)));transition:transform .3s ease}
+    .fng span{font-size:12px;color:var(--muted)}
+
     .table{max-width:1300px;margin:14px auto;border-collapse:separate;border-spacing:0 10px;padding:0 8px 24px}
-    .row{display:grid;grid-template-columns:200px minmax(380px,1fr) minmax(420px,1fr);gap:12px;align-items:stretch}
+    .row{display:grid;grid-template-columns:200px minmax(360px,1fr) minmax(360px,1fr);gap:12px;align-items:stretch}
     .row+.row{margin-top:12px}
     .cell{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;min-height:240px;display:flex}
     .sym{padding:12px;display:grid;grid-template-rows:auto 1fr auto;width:100%;gap:8px}
@@ -30,19 +36,15 @@
     .score.good{color:var(--good)}
     .score.bad{color:var(--bad)}
     .actions{display:flex;gap:8px}
+
     .trends{background:var(--panel-2);border-right:1px solid var(--border);width:100%}
     .trends iframe{width:100%;height:100%;min-height:240px;border:0}
+
     .mini{position:relative;width:100%;background:var(--panel-2)}
     .mini .tvbox{position:relative;min-height:240px}
     .mini .vals{position:absolute;bottom:8px;right:8px;display:flex;gap:6px;flex-wrap:wrap}
-    dialog{border:1px solid var(--border);border-radius:14px;background:var(--panel);color:var(--text);width:480px}
-    dialog::backdrop{background:rgba(0,0,0,.6)}
-    .modal-body{display:grid;gap:10px;padding:16px}
-    .field{display:grid;grid-template-columns:1fr 120px;gap:10px;align-items:center}
-    .field input[type=number]{width:100%}
+
     .row-head{display:grid;grid-template-columns:200px 1fr 1fr;gap:12px;padding:0 8px;margin:10px auto;max-width:1300px;color:var(--muted);font-size:12px}
-    .note{max-width:1300px;margin:0 auto 18px;padding:0 16px;color:var(--muted);font-size:12px}
-    .muted{color:var(--muted)}
     @media(max-width:1100px){.row,.row-head{grid-template-columns:1fr}.cell{min-height:240px}}
   </style>
 </head>
@@ -51,217 +53,134 @@
     <div class="wrap">
       <h1>🚀 BREAKTHROUGH Monitor</h1>
       <div class="controls">
-        <div class="control"><label for="geo">Geo</label>
-          <select id="geo"><option value="US">US</option><option value="">Worldwide</option></select>
+        <div class="fng" id="fngBox">
+          <div class="gauge" id="gauge"><div class="needle" id="needle"></div></div>
+          <div>
+            <div style="font-weight:700">Fear/Greed: <span id="fngVal">50</span></div>
+            <span>Manual for now — can wire live index later.</span>
+          </div>
+          <input id="fngInput" type="range" min="0" max="100" value="50" />
         </div>
-        <div class="control"><label for="range">Trends range</label>
-          <select id="range"><option value="today 1-m">Past 30 days</option><option value="now 7-d">Past 7 days</option><option value="today 3-m">Past 90 days</option><option value="today 12-m">Past 12 months</option></select>
+        <div class="control"><label for="range">Chart range</label>
+          <select id="range">
+            <option value="1M">1M</option>
+            <option value="3M">3M</option>
+            <option value="6M">6M</option>
+            <option value="12M" selected>12M</option>
+            <option value="ALL">ALL</option>
+          </select>
+        </div>
+        <div class="control"><label for="geo">Trends Geo</label>
+          <select id="geo"><option value="US" selected>US</option><option value="">Worldwide</option></select>
+        </div>
+        <div class="control"><label for="trendTime">Trends range</label>
+          <select id="trendTime"><option value="now 7-d">7d</option><option value="today 1-m" selected>30d</option><option value="today 3-m">90d</option><option value="today 12-m">12m</option></select>
         </div>
         <div class="control"><label for="add">Add ticker</label>
           <input id="add" type="text" placeholder="e.g. PLTR" />
           <button id="addBtn">Add</button>
         </div>
-        <button class="ghost" id="sortBtn">Sort by Value Score</button>
       </div>
     </div>
   </header>
 
-  <div class="row-head"><div>Symbol</div><div>Google Trends (sparkline)</div><div>Mini chart + Valuation</div></div>
-
-  <div class="note">Fixes: Google Trends 404 avoided by using <code>hl</code>, <code>cmpt=q</code>, and timezone params; right column now shows a TradingView Mini Symbol Overview (no Buy/Sell dial); cards are taller; you can remove tickers; manual valuation fields (P/E, P/S, EV/S, Market Cap) live in the Edit dialog until we wire live data.</div>
+  <div class="row-head"><div>Symbol</div><div>Google Trends</div><div>Mini chart + Valuation</div></div>
 
   <main class="table" id="table"></main>
 
-  <dialog id="scoreModal">
-    <form method="dialog" class="modal-body">
-      <h3 id="scoreTitle" style="margin:0 0 6px">Adjust Value Score</h3>
-      <p class="muted" style="margin:0 0 8px">These controls power the local Value Score. We'll connect live data later.</p>
-      <div class="field"><label>Momentum (0-100)</label><input type="number" id="m_momo" min="0" max="100"></div>
-      <div class="field"><label>Volume pressure (0-100)</label><input type="number" id="m_vol" min="0" max="100"></div>
-      <div class="field"><label>Trend buzz (0-100)</label><input type="number" id="m_trend" min="0" max="100"></div>
-      <div class="field"><label>News/catalysts (0-100)</label><input type="number" id="m_news" min="0" max="100"></div>
-      <div class="field"><label>Asymmetry (0-100)</label><input type="number" id="m_risk" min="0" max="100"></div>
-      <div class="field"><label>Weight: Momentum</label><input type="number" id="w_momo" min="0" max="100"></div>
-      <div class="field"><label>Weight: Volume</label><input type="number" id="w_vol" min="0" max="100"></div>
-      <div class="field"><label>Weight: Trend</label><input type="number" id="w_trend" min="0" max="100"></div>
-      <div class="field"><label>Weight: News</label><input type="number" id="w_news" min="0" max="100"></div>
-      <div class="field"><label>Weight: Asym.</label><input type="number" id="w_risk" min="0" max="100"></div>
-      <hr style="border-color:var(--border);opacity:.6">
-      <div class="muted">Valuation (manual for now)</div>
-      <div class="field"><label>P/E</label><input type="number" id="v_pe" step="0.01"></div>
-      <div class="field"><label>P/S</label><input type="number" id="v_ps" step="0.01"></div>
-      <div class="field"><label>EV/S</label><input type="number" id="v_evs" step="0.01"></div>
-      <div class="field"><label>Market Cap</label><input type="text" id="v_mcap" placeholder="$52B"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px"><button value="cancel" class="ghost">Cancel</button><button id="saveScoreBtn" value="default">Save</button></div>
-    </form>
-  </dialog>
-
   <script>
-    // ------- CONFIG -------
-    const WATCHLIST = [
-      { ticker: 'PLTR', name: 'Palantir', exchange: 'NYSE', trendsQuery: 'Palantir' },
-      { ticker: 'QSI',  name: 'Quantum-Si', exchange: 'NASDAQ', trendsQuery: 'Quantum-Si' },
-      { ticker: 'APLD', name: 'Applied Digital', exchange: 'NASDAQ', trendsQuery: 'Applied Digital' },
-      { ticker: 'INOD', name: 'Innodata', exchange: 'NASDAQ', trendsQuery: 'Innodata' },
-      { ticker: 'INDI', name: 'indie Semiconductor', exchange: 'NASDAQ', trendsQuery: 'indie Semiconductor' },
-      { ticker: 'PATH', name: 'UiPath', exchange: 'NYSE', trendsQuery: 'UiPath' },
-      { ticker: 'IRDM', name: 'Iridium', exchange: 'NASDAQ', trendsQuery: 'Iridium (company)' },
-      { ticker: 'NVDA', name: 'NVIDIA', exchange: 'NASDAQ', trendsQuery: 'NVIDIA' },
-      { ticker: 'TPIC', name: 'TPI Composites', exchange: 'NASDAQ', trendsQuery: 'TPI Composites' },
-      { ticker: 'LCID', name: 'Lucid Motors', exchange: 'NASDAQ', trendsQuery: 'Lucid Motors' },
-      { ticker: 'MVIS', name: 'MicroVision', exchange: 'NASDAQ', trendsQuery: 'MicroVision' }
+    // --- Watchlist ---
+    const WATCHLIST=[
+      { ticker:'PLTR', name:'Palantir', exchange:'NYSE', trendsQuery:'Palantir' },
+      { ticker:'QSI', name:'Quantum-Si', exchange:'NASDAQ', trendsQuery:'Quantum-Si' },
+      { ticker:'APLD', name:'Applied Digital', exchange:'NASDAQ', trendsQuery:'Applied Digital' },
     ];
 
-    const DEFAULT_MODEL = {
-      metrics:{momo:55,vol:55,trend:50,news:50,risk:55},
-      weights:{momo:30,vol:25,trend:20,news:15,risk:10},
-      valuation:{pe:null,ps:null,evs:null,mcap:null}
-    };
+    const state={ rows:[], range:'12M', geo:'US', trendTime:'today 1-m' };
 
-    // ------- STATE -------
-    const state = {
-      geo: 'US', range: 'today 1-m', rows: [],
-      getModel(t){ const raw=localStorage.getItem(`bt_model_${t}`); if(!raw) return structuredClone(DEFAULT_MODEL); try{return JSON.parse(raw)}catch{return structuredClone(DEFAULT_MODEL)} },
-      setModel(t,m){ localStorage.setItem(`bt_model_${t}`, JSON.stringify(m)); }
-    };
+    // --- Fear/Greed gauge (manual) ---
+    const fngInput=document.getElementById('fngInput');
+    const fngVal=document.getElementById('fngVal');
+    const needle=document.getElementById('needle');
+    function setFNG(v){ document.getElementById('gauge').style.setProperty('--v', v); needle.style.transform=`rotate(${ -90 + (v*1.8) }deg)`; fngVal.textContent=v; localStorage.setItem('bt_fng', v); }
+    setFNG(+localStorage.getItem('bt_fng')||50);
+    fngInput.addEventListener('input',e=>setFNG(+e.target.value));
 
-    // ------- HELPERS -------
+    // --- Helpers ---
+    function tvMiniConfig(ticker){ return { symbol:ticker, width:'100%', height:240, locale:'en', dateRange:state.range, colorTheme:'dark', isTransparent:true, autosize:true, largeChartUrl:`https://www.tradingview.com/symbols/${ticker}/`, noTimeScale:false }; }
+
     function trendSrc(query){
-      const base='https://trends.google.com/trends/embed/';
-      const q=encodeURIComponent(query);
-      const date=encodeURIComponent(state.range);
-      const geo=state.geo; // '' for worldwide
+      // Use the official TIMESERIES embed that Google Trends uses internally
+      const req={ comparisonItem:[{ keyword: query, geo: state.geo, time: state.trendTime }], category:0 };
       const tz=-new Date().getTimezoneOffset();
-      return `${base}?hl=en-US&q=${q}&geo=${geo}&date=${date}&cmpt=q&tz=${tz}`;
+      const base='https://trends.google.com/trends/embed/explore/TIMESERIES';
+      const params=new URLSearchParams({ hl:'en-US', req: JSON.stringify(req), tz: String(tz) });
+      return `${base}?${params.toString()}`;
     }
-
-    function tvMiniConfig(ticker){
-      return { symbol:ticker, width:"100%", height:240, locale:"en", dateRange:"12M", colorTheme:"dark", isTransparent:true, autosize:true, largeChartUrl:`https://www.tradingview.com/symbols/${ticker}/`, noTimeScale:false };
-    }
-
-    function calcValueScore(model){
-      const m=model.metrics,w=model.weights; const sumw=Math.max(1,(w.momo+w.vol+w.trend+w.news+w.risk));
-      const weighted=(m.momo*w.momo+m.vol*w.vol+m.trend*w.trend+m.news*w.news+m.risk*w.risk)/sumw; return Math.round(weighted);
-    }
-    function scoreClass(s){ return s>=60?'good':(s<=40?'bad':''); }
-
-    // ------- RENDER -------
-    const table=document.getElementById('table');
 
     function makeRow(stock){
       const row=document.createElement('div'); row.className='row';
       const left=document.createElement('div'); left.className='cell sym';
       left.innerHTML=`
         <div><div class="ticker">${stock.ticker}</div><div class="name">${stock.name}</div></div>
-        <div class="chips" data-chips></div>
-        <div class="actions">
-          <button class="ghost" data-edit>Edit</button>
-          <button class="ghost" data-remove>Remove</button>
-          <a class="ghost" href="https://www.tradingview.com/symbols/${stock.ticker}" target="_blank" rel="noopener">Open on TV</a>
-        </div>`;
-      const chipsWrap=left.querySelector('[data-chips]');
-      const addChip=(t)=>{const s=document.createElement('span');s.className='chip';s.textContent=t;chipsWrap.appendChild(s)};
-      addChip(stock.exchange); addChip(`Trends: ${stock.trendsQuery}`);
+        <div class="chips"><span class="chip">${stock.exchange}</span><span class="chip">Trends: ${stock.trendsQuery||stock.name}</span></div>
+        <div class="actions"><button class="ghost" data-remove>Remove</button></div>`;
 
       const mid=document.createElement('div'); mid.className='cell trends';
-      const iframe=document.createElement('iframe'); iframe.loading='lazy'; iframe.title=`${stock.trendsQuery} – Google Trends`; iframe.src=trendSrc(stock.trendsQuery); mid.appendChild(iframe);
+      const tFrame=document.createElement('iframe'); tFrame.loading='lazy'; tFrame.title=`${stock.trendsQuery||stock.name} — Google Trends`; tFrame.src=trendSrc(stock.trendsQuery||stock.name); mid.appendChild(tFrame);
 
       const right=document.createElement('div'); right.className='cell mini';
-      const tvbox=document.createElement('div'); tvbox.className='tvbox';
-      const chips=document.createElement('div'); chips.className='vals';
-      const model=state.getModel(stock.ticker);
-      const score=calcValueScore(model); const scoreEl=document.createElement('span'); scoreEl.className=`chip score ${scoreClass(score)}`; scoreEl.textContent=`Value ${score}`; chips.appendChild(scoreEl);
-      // valuation chips
-      if(model.valuation.mcap) { const s=document.createElement('span'); s.className='chip'; s.textContent=`MCap: ${model.valuation.mcap}`; chips.appendChild(s);} 
-      if(model.valuation.pe) { const s=document.createElement('span'); s.className='chip'; s.textContent=`P/E: ${model.valuation.pe}`; chips.appendChild(s);} 
-      if(model.valuation.ps) { const s=document.createElement('span'); s.className='chip'; s.textContent=`P/S: ${model.valuation.ps}`; chips.appendChild(s);} 
-      if(model.valuation.evs) { const s=document.createElement('span'); s.className='chip'; s.textContent=`EV/S: ${model.valuation.evs}`; chips.appendChild(s);} 
+      const tvbox=document.createElement('div'); tvbox.className='tvbox'; right.appendChild(tvbox);
+      const chips=document.createElement('div'); chips.className='vals'; right.appendChild(chips);
 
-      right.appendChild(tvbox); right.appendChild(chips);
+      // Value chip placeholder (kept from earlier design)
+      const scoreEl=document.createElement('span'); scoreEl.className='chip score'; scoreEl.textContent='Value —'; chips.appendChild(scoreEl);
 
+      // Mount TradingView mini chart lazily
+      lazyMountMiniChart(tvbox, `${stock.exchange}:${stock.ticker}`);
+
+      // Compose
       row.appendChild(left); row.appendChild(mid); row.appendChild(right);
-
-      left.querySelector('[data-edit]').addEventListener('click',()=>openScoreEditor(stock.ticker, row));
-      left.querySelector('[data-remove]').addEventListener('click',()=>removeTicker(stock.ticker,row));
-
-      lazyMountMiniChart(tvbox, stock.ticker);
-
       table.appendChild(row);
-      state.rows.push({ el:row, data:stock, scoreEl, get score(){ return calcValueScore(state.getModel(stock.ticker)); } });
+
+      state.rows.push({ el:row, data:stock, tvbox, tFrame, scoreEl });
     }
 
-    function lazyMountMiniChart(container,ticker){
-      const mount=()=>{ if(container.dataset.mounted) return; container.dataset.mounted='1'; addTVMini(container,ticker); };
+    function lazyMountMiniChart(container,symbol){
+      const mount=()=>{ if(container.dataset.mounted) return; container.dataset.mounted='1'; addTVMini(container, symbol); };
       const io=new IntersectionObserver((entries)=>{ entries.forEach(e=>{ if(e.isIntersecting){ mount(); io.disconnect(); } }); },{rootMargin:'200px'});
       io.observe(container);
     }
 
-    function addTVMini(container,ticker){
-      const script=document.createElement('script'); script.type='text/javascript'; script.src='https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js'; script.async=true; script.text=JSON.stringify(tvMiniConfig(ticker)); container.appendChild(script);
+    function addTVMini(container,symbol){
+      const script=document.createElement('script'); script.type='text/javascript'; script.src='https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js'; script.async=true; script.text=JSON.stringify(tvMiniConfig(symbol)); container.appendChild(script);
     }
 
-    // ------- SCORE EDITOR -------
-    const modal=document.getElementById('scoreModal');
-    const title=document.getElementById('scoreTitle');
-    const inputs=['momo','vol','trend','news','risk'].reduce((a,k)=>{a[k]=document.getElementById('m_'+k);return a;},{});
-    const weights=['momo','vol','trend','news','risk'].reduce((a,k)=>{a[k]=document.getElementById('w_'+k);return a;},{});
-    let editingTicker=null, editingRow=null;
-
-    function openScoreEditor(ticker,row){
-      editingTicker=ticker; editingRow=row;
-      const m=state.getModel(ticker);
-      title.textContent=`Adjust Value Score — ${ticker}`;
-      inputs.momo.value=m.metrics.momo; inputs.vol.value=m.metrics.vol; inputs.trend.value=m.metrics.trend; inputs.news.value=m.metrics.news; inputs.risk.value=m.metrics.risk;
-      weights.momo.value=m.weights.momo; weights.vol.value=m.weights.vol; weights.trend.value=m.weights.trend; weights.news.value=m.weights.news; weights.risk.value=m.weights.risk;
-      document.getElementById('v_pe').value=m.valuation.pe ?? '';
-      document.getElementById('v_ps').value=m.valuation.ps ?? '';
-      document.getElementById('v_evs').value=m.valuation.evs ?? '';
-      document.getElementById('v_mcap').value=m.valuation.mcap ?? '';
-      modal.showModal();
-    }
-
-    document.getElementById('saveScoreBtn').addEventListener('click',(e)=>{
-      e.preventDefault(); if(!editingTicker) return modal.close();
-      const model={
-        metrics:{momo:clamp(+inputs.momo.value),vol:clamp(+inputs.vol.value),trend:clamp(+inputs.trend.value),news:clamp(+inputs.news.value),risk:clamp(+inputs.risk.value)},
-        weights:{momo:clamp(+weights.momo.value),vol:clamp(+weights.vol.value),trend:clamp(+weights.trend.value),news:clamp(+weights.news.value),risk:clamp(+weights.risk.value)},
-        valuation:{pe:numOrNull(document.getElementById('v_pe').value),ps:numOrNull(document.getElementById('v_ps').value),evs:numOrNull(document.getElementById('v_evs').value),mcap:document.getElementById('v_mcap').value.trim()||null}
-      };
-      state.setModel(editingTicker,model);
-      const row=editingRow || state.rows.find(r=>r.data.ticker===editingTicker)?.el;
-      if(row){
-        const newScore=calcValueScore(model);
-        const sEl = state.rows.find(r=>r.data.ticker===editingTicker).scoreEl;
-        sEl.textContent=`Value ${newScore}`; sEl.className=`chip score ${scoreClass(newScore)}`;
-        const chipsWrap=row.querySelector('[data-chips]');
-        chipsWrap.querySelectorAll('.chip').forEach((c,i)=>{ if(i>1) c.remove(); }); // keep first two
-        if(model.valuation.mcap){const s=document.createElement('span');s.className='chip';s.textContent=`MCap: ${model.valuation.mcap}`;chipsWrap.appendChild(s)}
-        if(model.valuation.pe){const s=document.createElement('span');s.className='chip';s.textContent=`P/E: ${model.valuation.pe}`;chipsWrap.appendChild(s)}
-        if(model.valuation.ps){const s=document.createElement('span');s.className='chip';s.textContent=`P/S: ${model.valuation.ps}`;chipsWrap.appendChild(s)}
-        if(model.valuation.evs){const s=document.createElement('span');s.className='chip';s.textContent=`EV/S: ${model.valuation.evs}`;chipsWrap.appendChild(s)}
-      }
-      editingTicker=null; editingRow=null; modal.close();
+    // --- Event delegation for Remove button (more reliable) ---
+    document.getElementById('table').addEventListener('click', (e)=>{
+      const btn=e.target.closest('[data-remove]'); if(!btn) return; const row=btn.closest('.row'); const sym=row.querySelector('.ticker')?.textContent.trim(); row.remove(); state.rows=state.rows.filter(r=>r.data.ticker!==sym);
     });
 
-    function clamp(n){return Math.max(0,Math.min(100,Number.isFinite(n)?n:0))}
-    function numOrNull(x){const n=Number(x); return Number.isFinite(n)?n:null}
-    function removeTicker(ticker,rowEl){ state.rows=state.rows.filter(r=>r.data.ticker!==ticker); rowEl.remove(); }
-
-    // ------- CONTROLS -------
-    const geoSel=document.getElementById('geo'); const rangeSel=document.getElementById('range');
-    geoSel.addEventListener('change',()=>{state.geo=geoSel.value;refreshTrends()});
-    rangeSel.addEventListener('change',()=>{state.range=rangeSel.value;refreshTrends()});
-
-    function refreshTrends(){ document.querySelectorAll('.trends iframe').forEach((f,idx)=>{ const stock=state.rows[idx].data; f.src=trendSrc(stock.trendsQuery); }); }
-
+    // --- Controls ---
+    const table=document.getElementById('table');
     document.getElementById('addBtn').addEventListener('click',()=>{
-      const input=document.getElementById('add'); const raw=input.value.trim().toUpperCase(); if(!raw) return; if(state.rows.some(r=>r.data.ticker===raw)){input.value='';return}
-      const item={ticker:raw,name:raw,exchange:'US',trendsQuery:raw}; makeRow(item); input.value='';
+      const input=document.getElementById('add'); const raw=input.value.trim().toUpperCase(); if(!raw) return;
+      if(state.rows.some(r=>r.data.ticker===raw)) { input.value=''; return; }
+      const item={ ticker:raw, name:raw, exchange:'NASDAQ', trendsQuery:raw };
+      makeRow(item); input.value='';
     });
 
-    document.getElementById('sortBtn').addEventListener('click',()=>{ state.rows.sort((a,b)=>b.score-a.score); state.rows.forEach(r=>table.appendChild(r.el)); });
+    document.getElementById('range').addEventListener('change',e=>{
+      state.range=e.target.value; // re-render each chart widget
+      state.rows.forEach(r=>{ r.tvbox.innerHTML=''; r.tvbox.removeAttribute('data-mounted'); lazyMountMiniChart(r.tvbox, `${r.data.exchange}:${r.data.ticker}`); });
+    });
 
-    // ------- INIT -------
+    document.getElementById('geo').addEventListener('change',e=>{ state.geo=e.target.value; refreshTrends(); });
+    document.getElementById('trendTime').addEventListener('change',e=>{ state.trendTime=e.target.value; refreshTrends(); });
+
+    function refreshTrends(){ state.rows.forEach(r=>{ r.tFrame.src=trendSrc(r.data.trendsQuery||r.data.name); }); }
+
+    // --- Init ---
     WATCHLIST.forEach(makeRow);
   </script>
 </body>
