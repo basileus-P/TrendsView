@@ -49,7 +49,7 @@
     { ticker:'APLD', name:'Applied Digital', exchange:'NASDAQ', trendsQuery:'Applied Digital' }
   ];
 
-  const state={ rows:[], range:'12M', geo:'US', trendTime:'today 1-m' };
+const state = { rows:[], range:'12M', geo:'US', trendTime:'today 1-m' };
 const table = document.getElementById('table');
 
   const fngVal=document.getElementById('fngVal');
@@ -137,42 +137,83 @@ const table = document.getElementById('table');
   document.getElementById('trendTime').addEventListener('change',e=>{ state.trendTime=e.target.value; refreshTrends(); });
   function refreshTrends(){ state.rows.forEach(r=>{ r.tFrame.src=trendSrc(r.data.trendsQuery||r.data.name); }); }
 
-  async function fetchFearGreed(){
-    try{
-      const url = 'https://r.jina.ai/http://edition.cnn.com/markets/fear-and-greed';
-      const html = await (await fetch(url)).text();
-      const m =
-        /dial-number[^>]*>(\d{1,3})/i.exec(html) ||
-        /Fear\s*&\s*Greed[^\d]*(\d{1,3})/i.exec(html) ||
-        /\"score\"\s*:\s*(\d{1,3})/i.exec(html);
-      if (m) {
-        const v = Math.max(0, Math.min(100, parseInt(m[1], 10)));
-        return { value: v, source: 'CNN' };
+ async function fetchFearGreed(){
+  // 1) CNN JSON (more stable) via reader
+  try{
+    const r = await fetch('https://r.jina.ai/http://production.dataviz.cnn.io/index/fearandgreed/score');
+    if(r.ok){
+      const t = await r.text();
+      const jsonStart = t.indexOf('{');           // handle reader preface
+      if (jsonStart >= 0) {
+        const j = JSON.parse(t.slice(jsonStart));
+        const v = Number(j?.fear_and_greed?.score ?? j?.score);
+        if (Number.isFinite(v)) return { value:v, source:'CNN' };
       }
-    }catch(e){ console.error('FNG fetch error',e); }
-    try{ const alt=await fetchFGStockComposite(); if(alt) return alt; }catch(e){ console.error('Alt FNG error',e); }
-    return null;
-  }
-
-  async function fetchValuation(ticker){
-    const url=`https://r.jina.ai/http://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price,summaryDetail,defaultKeyStatistics,financialData`;
-    try{
-      const r=await fetch(url);
-      if(!r.ok) return null;
-      const txt=await r.text();
-      const j=JSON.parse(txt);
-      const d=j?.quoteSummary?.result?.[0];
-      if(!d) return null;
-      const pe=d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null;
-      const ps=d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null;
-      const evs=d.defaultKeyStatistics?.enterpriseToRevenue?.raw ?? d.financialData?.enterpriseToRevenue?.raw ?? null;
-      const mcap=d.price?.marketCap?.fmt ?? (d.price?.marketCap?.raw? `$${Math.round(d.price.marketCap.raw/1e9)}B` : null);
-      return { pe, ps, evs, mcap };
-    } catch(e) {
-      console.error('Val fetch error', e);
-      return null;
     }
-  }
+  }catch{}
+
+  // 2) CNN HTML page via reader — parse the number from markup
+  try{
+    const html = await (await fetch('https://r.jina.ai/http://edition.cnn.com/markets/fear-and-greed')).text();
+    const m =
+      /dial-number[^>]*>(\d{1,3})/i.exec(html) ||
+      /Fear\s*&\s*Greed[^\d]*(\d{1,3})/i.exec(html) ||
+      /"score"\s*:\s*(\d{1,3})/i.exec(html);
+    if (m) {
+      const v = Math.max(0, Math.min(100, parseInt(m[1], 10)));
+      return { value:v, source:'CNN' };
+    }
+  }catch{}
+
+  // 3) Fallback: stock-only composite (VIX + ^CPC)
+  try{
+    const alt = await fetchFGStockComposite();
+    if (alt) return alt;
+  }catch{}
+
+  return null;
+}
+
+
+async function fetchValuation(ticker){
+  const parseMaybeJSON = (txt) => {
+    const i = txt.indexOf('{'), j = txt.lastIndexOf('}');
+    if (i >= 0 && j > i) { try { return JSON.parse(txt.slice(i, j+1)); } catch { return null; } }
+    return null;
+  };
+
+  // Try quoteSummary (richer fields)
+  try{
+    const u1 = `https://r.jina.ai/http://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price,summaryDetail,defaultKeyStatistics,financialData`;
+    const t1 = await (await fetch(u1)).text();
+    const j1 = parseMaybeJSON(t1);
+    const d  = j1?.quoteSummary?.result?.[0];
+    if (d){
+      const pe  = d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null;
+      const ps  = d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null;
+      const evs = d.defaultKeyStatistics?.enterpriseToRevenue?.raw ?? d.financialData?.enterpriseToRevenue?.raw ?? null;
+      const mcap = d.price?.marketCap?.fmt ?? (d.price?.marketCap?.raw ? `$${Math.round(d.price.marketCap.raw/1e9)}B` : null);
+      return { pe, ps, evs, mcap };
+    }
+  }catch{}
+
+  // Fallback: v7 quote (fewer fields but often available)
+  try{
+    const u2 = `https://r.jina.ai/http://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ticker)}`;
+    const t2 = await (await fetch(u2)).text();
+    const j2 = parseMaybeJSON(t2);
+    const q  = j2?.quoteResponse?.result?.[0];
+    if (q){
+      const pe  = q.trailingPE ?? null;
+      const ps  = q.priceToSalesTrailing12Months ?? null;
+      const evs = null; // not on v7
+      const mcap = q.marketCap ? `$${Math.round(q.marketCap/1e9)}B` : null;
+      return { pe, ps, evs, mcap };
+    }
+  }catch{}
+
+  return null;
+}
 
   function renderValuation(left, v){
     const m=left.querySelector('[data-metrics]');
