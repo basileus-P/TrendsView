@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BREAKTHROUGH — Stocks + Trends + Pre-Breakout + Valuation</title>
+  <title>BREAKTHROUGH — Stocks + Trends + Potential Tracker</title>
   <style>
     :root {
       --bg:#0b0f14; --panel:#111826; --border:#1c2633; --text:#e6eef7; --muted:#9fb3c8;
@@ -12,7 +12,6 @@
     html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 
-    /* Project Tabs */
     .tabs{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);background:#0a1018;position:sticky;top:0;z-index:5}
     .tab{padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:#0f1826;color:var(--muted);text-decoration:none;cursor:pointer}
     .tab.active{background:#172335;color:#fff;border-color:#223146}
@@ -31,24 +30,15 @@
     .card h2{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.2px;padding-right:36px}
     .remove-btn{position:absolute;top:10px;right:10px;background:#1b293d;border:1px solid var(--border);color:#d77;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer}
     .remove-btn:hover{filter:brightness(1.1)}
-    .strength-badge{position:absolute;top:10px;left:10px;background:var(--chip);border:1px solid var(--border);padding:4px 8px;border-radius:8px;font-size:12px;color:var(--muted)}
-    .strength-badge strong{color:#fff}
-
-    .chart{height:400px}
-    .trend{height:360px}
 
     table{width:100%;border-collapse:collapse;color:var(--text)}
     th,td{border-color:var(--border);padding:6px 4px}
     th{border-bottom:1px solid var(--border);text-align:left}
     td.val{text-align:right}
-    td.sig{text-align:center;width:70px}
+    td.sig{text-align:center;width:60px}
     .ok{color:var(--good);font-weight:600}
     .ko{color:var(--muted)}
     .warn{color:var(--warn)}
-    .chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 0}
-    .chip{background:var(--chip);border:1px solid var(--border);padding:2px 6px;border-radius:999px;font-size:11px;color:var(--muted)}
-    .chip.ok{color:#10d48a;border-color:#194c3a}
-    .chip.warn{color:#d6a019;border-color:#5a4a19}
 
     .spark{height:44px}
     .spark svg{width:100%;height:44px;display:block}
@@ -56,35 +46,28 @@
     .spark .fill{fill:rgba(143,182,255,0.12);stroke:none}
     .spark .axis{stroke:#233046;stroke-width:1}
 
-    .news{margin-top:10px}
-    .news h3{margin:8px 0 4px;font-size:12px;color:var(--muted)}
-    .news ul{list-style:none;padding:0;margin:0}
-    .news li{margin:6px 0}
-    .news a{color:var(--accent);text-decoration:none}
-    .news a:hover{text-decoration:underline}
-    .news time{color:var(--muted);font-size:11px;margin-left:6px}
-
     @media (max-width:980px){
       .container{grid-template-columns:1fr}
-      .chart,.trend{height:300px}
     }
   </style>
 </head>
 <body>
-<nav class="tabs">
-  <a class="tab active" href="index.html" title="Trending monitor">TRENDING</a>
-  <a class="tab" href="breakthrough.html" title="Breakthrough monitor">BREAKTHROUGH</a>
-</nav>
- 
+  <!-- Tabs -->
+  <nav class="tabs">
+    <a href="index.html" class="tab">INDEX</a>
+    <span class="tab active">BREAKTHROUGH</span>
+    <span class="tab disabled">SETTINGS</span>
+  </nav>
+
   <header>
-    <h1>Left: Price • Middle: Google Trends (1m) • Right: Pre-Breakout + Valuation + News</h1>
+    <h1>Stocks (left) • Google Trends (middle) • Potential Breakthrough (right)</h1>
     <div class="toolbar">
-      <input id="in-symbol" placeholder="EXCHANGE:TICKER (e.g., NASDAQ:MVIS)" size="26" />
+      <input id="in-symbol" placeholder="EXCHANGE:TICKER" size="26" />
       <input id="in-name" placeholder="Display name" size="18" />
       <input id="in-trend" placeholder="Google Trends term" size="18" />
       <button id="btn-add">Add / Update</button>
       <button id="btn-reset">Reset defaults</button>
-      <button id="btn-refresh">Refresh Now</button>
+      <button id="btn-refresh">Refresh</button>
       <span id="last-updated"></span>
     </div>
   </header>
@@ -93,582 +76,90 @@
 
   <script src="https://ssl.gstatic.com/trends_nrtr/3343_RC01/embed_loader.js"></script>
   <script>
-    /* =============================
-       CONFIG — same base list
-       ============================= */
     const DEFAULT_WATCHLIST = [
-      { symbol: "NASDAQ:MVIS", name: "MicroVision (MVIS)", trendTerm: "MicroVision" },
-      { symbol: "NASDAQ:QSI",  name: "Quantum-Si (QSI)",   trendTerm: "Quantum-Si" },
-      { symbol: "NASDAQ:REKR", name: "Rekor Systems (REKR)", trendTerm: "Rekor Systems" }
+      { symbol: "NASDAQ:MVIS", name: "MicroVision", trendTerm: "MicroVision" },
+      { symbol: "NASDAQ:QSI", name: "Quantum-Si", trendTerm: "Quantum-Si" }
     ];
-    const STORAGE_KEY = 'WATCHLIST_V3_BREAKTHROUGH';
+    const STORAGE_KEY = 'WATCHLIST_BREAKTHROUGH';
 
-    // Trends embed
-    const TRENDS_GEO  = "";
-    const TRENDS_TIME = "today 1-m";
+    function yTicker(sym){ return String(sym||'').split(':').pop().toUpperCase(); }
+    function rowIdFromSymbol(symbol){ return 'row-'+yTicker(symbol); }
+    function cellId(rowId,key){ return `${key}-${rowId}`; }
 
-    // Benchmark + windows
-    const BENCHMARK = "QQQ";
-    const RS_LOOKBACK = 10;
-    const AVG_VOL_WINDOW = 20;
-    const HIGH_LOOKBACK = 30;
-    const MA50_WINDOW = 50;
-    const MA200_WINDOW = 200;
-
-    // Auto refresh
-    const REFRESH_MS = 5 * 60 * 1000;
-    const NEWS_REFRESH_MS = 15 * 60 * 1000;
-
-    /* =============================
-       Helpers / storage
-       ============================= */
-    function yTicker(sym){ return String(sym || '').split(':').pop().trim().toUpperCase(); }
-    function rowIdFromSymbol(symbol){ return 'row-' + yTicker(symbol).replace(/[^A-Z0-9_-]/g,''); }
-    function cellId(rowId, key){ return `${key}-${rowId}`; }
-
-    function getWatchlist(){
-      try{
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw) return DEFAULT_WATCHLIST.slice();
-        const arr = JSON.parse(raw);
-        if(!Array.isArray(arr) || !arr.length) return DEFAULT_WATCHLIST.slice();
-        return arr;
-      }catch{ return DEFAULT_WATCHLIST.slice(); }
-    }
-    function setWatchlist(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }catch{} }
-
-    /* =============================
-       Embeds
-       ============================= */
     const grid = document.getElementById('grid');
+    function getWatchlist(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY))||DEFAULT_WATCHLIST; }catch{ return DEFAULT_WATCHLIST; } }
+    function setWatchlist(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
 
     function renderTradingView(container, symbol){
-      container.innerHTML = '';
       const wrap=document.createElement('div');
-      wrap.className='tradingview-widget-container';
-      const widget=document.createElement('div');
-      widget.className='tradingview-widget-container__widget';
-      wrap.appendChild(widget);
+      wrap.innerHTML=`<div class="tradingview-widget-container__widget"></div>`;
       const s=document.createElement('script');
-      s.type='text/javascript';
       s.src='https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
-      s.async=true;
-      s.innerHTML=JSON.stringify({
-        symbols:[[symbol+"|1D"]],
-        chartOnly:false,width:"100%",height:"100%",locale:"en",autosize:true,
-        dateRange:"12M",showVolume:true,showMA:true,colorTheme:"dark"
-      });
+      s.innerHTML=JSON.stringify({symbols:[[symbol+"|1D"]],width:"100%",height:"100%",locale:"en"});
       wrap.appendChild(s);
       container.appendChild(wrap);
     }
 
     function renderTrends(container, keyword){
-      try{
-        if (window.trends && trends.embed && typeof trends.embed.renderExploreWidgetTo==='function'){
-          trends.embed.renderExploreWidgetTo(
-            container,'TIMESERIES',
-            { comparisonItem:[{ keyword, geo:TRENDS_GEO, time:TRENDS_TIME }], category:0, property:'' },
-            { exploreQuery:`q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`,
-              guestPath:'https://trends.google.com:443/trends/embed/' }
-          ); return;
-        }
-        const src = `https://trends.google.com:443/trends/embed/?q=${encodeURIComponent(keyword)}&geo=${TRENDS_GEO}&date=${encodeURIComponent(TRENDS_TIME)}`;
-        const iframe=document.createElement('iframe');
-        iframe.src=src; iframe.width='100%'; iframe.height='100%'; iframe.frameBorder='0'; iframe.loading='lazy';
-        container.appendChild(iframe);
-      }catch(e){
-        const err=document.createElement('div'); err.style.color='#f99'; err.textContent='Trends embed error: '+e.message; container.appendChild(err);
-      }
+      const src = `https://trends.google.com/trends/embed/?q=${encodeURIComponent(keyword)}&geo=&date=today 1-m`;
+      container.innerHTML=`<iframe src="${src}" width="100%" height="100%" frameborder="0"></iframe>`;
     }
 
-    /* =============================
-       CORS-resilient fetchers (same pattern you use)
-       ============================= */
-    const MAX_CONCURRENCY = 2;
-    let inflight = 0; const waiters = [];
-    function withLimit(fn){
-      return new Promise(async (resolve,reject)=>{
-        const enter = async ()=>{
-          inflight++;
-          try{ resolve(await fn()); } catch(e){ reject(e); }
-          finally{ inflight--; const n = waiters.shift(); if(n) n(); }
-        };
-        if(inflight>=MAX_CONCURRENCY) waiters.push(enter); else enter();
-      });
-    }
-    async function getRaw(url) {
-      const proxies = [
-        'https://cors.isomorphic-git.org/' + url,
-        'https://corsproxy.io/?' + encodeURIComponent(url),
-        'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
-      ];
-      const bust = u => u + (u.includes('?')?'&':'?') + 'nc=' + (Date.now()+Math.floor(Math.random()*999));
-      let lastErr;
-      for (const p of proxies) {
-        for (let attempt=1; attempt<=2; attempt++){
-          try{
-            const txt = await withLimit(async ()=>{
-              const r = await fetch(bust(p));
-              if(!r.ok){
-                if(r.status===429 || r.status>=500) throw new Error('retry '+r.status);
-                throw new Error('status '+r.status);
-              }
-              return r.text();
-            });
-            return txt;
-          }catch(e){ lastErr=e; await new Promise(r=>setTimeout(r,150*attempt+Math.random()*250)); }
-        }
-      }
-      throw lastErr || new Error('all proxies failed');
-    }
-    async function getJSON(url){ const t = await getRaw(url); try{ return JSON.parse(t); }catch(e){ throw new Error('bad JSON'); } }
+    function buildRow(item){
+      const rid=rowIdFromSymbol(item.symbol);
 
-    // Yahoo helpers (as in your working page)
-    async function yahooChart(ticker, range='1y', interval='1d'){
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=${interval}&includePrePost=false&events=div%7Csplit`;
-      return getJSON(url);
-    }
-    async function yahooEarnings(ticker){
-      const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=calendarEvents`;
-      return getJSON(url);
-    }
-    async function yahooFundamentals(ticker){
-      const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price,financialData,defaultKeyStatistics,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory`;
-      return getJSON(url);
-    }
+      const left=document.createElement('div');
+      left.className='card';
+      left.innerHTML=`<h2>${item.name} — Price & Chart</h2><div class="chart"></div>`;
 
-    /* =============================
-       Math helpers
-       ============================= */
-    function smaArr(arr,n){
-      if(!arr?.length) return [];
-      const out=[]; let s=0;
-      for(let i=0;i<arr.length;i++){
-        s+=arr[i]; if(i>=n) s-=arr[i-n];
-        out.push(i>=n-1 ? s/n : NaN);
-      }
-      return out;
-    }
-    function stdDev(arr){
-      if(!arr?.length) return 0;
-      const m = arr.reduce((a,b)=>a+b,0)/arr.length;
-      const v = arr.reduce((a,b)=>a+(b-m)*(b-m),0)/arr.length;
-      return Math.sqrt(v);
-    }
-    function linRegSlope(y){
-      const n=y.length; if(n<2) return 0;
-      let sx=0, sy=0, sxy=0, sxx=0;
-      for(let i=0;i<n;i++){ const x=i+1; sx+=x; sy+=y[i]; sxy+=x*y[i]; sxx+=x*x; }
-      const num = n*sxy - sx*sy; const den = n*sxx - sx*sx;
-      return den===0 ? 0 : num/den;
-    }
-    function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
-    function pct(a,b){ if(!isFinite(a)||!isFinite(b)||b===0) return 0; return (a/b - 1); }
+      const mid=document.createElement('div');
+      mid.className='card';
+      mid.innerHTML=`<h2>Google Trends — “${item.trendTerm}”</h2><div class="trend" id="trend-${rid}"></div>`;
 
-    /* =============================
-       Pre-Breakout metrics
-       ============================= */
-    function computePreBreakout(closes, volumes, benchCloses){
-      const n = closes.length;
-      const price = closes[n-1] ?? NaN;
-      const dayChg = n>=2 ? (closes[n-1]-closes[n-2])/(closes[n-2]||1) : 0;
+      const right=document.createElement('div');
+      right.className='card';
+      right.innerHTML=`
+        <h2>Potential Breakthrough</h2>
+        <table>
+          <thead><tr><th>Metric</th><th class="val">Value</th><th class="sig">Signal</th></tr></thead>
+          <tbody>
+            <tr><td>Market Cap</td><td id="${cellId(rid,'cap')}" class="val">—</td><td id="${cellId(rid,'cap-s')}" class="sig">—</td></tr>
+            <tr><td>P/E Ratio</td><td id="${cellId(rid,'pe')}" class="val">—</td><td id="${cellId(rid,'pe-s')}" class="sig">—</td></tr>
+            <tr><td>Revenue Growth</td><td id="${cellId(rid,'rev')}" class="val">—</td><td id="${cellId(rid,'rev-s')}" class="sig">—</td></tr>
+            <tr><td>Analyst Rating</td><td id="${cellId(rid,'rating')}" class="val">—</td><td id="${cellId(rid,'rating-s')}" class="sig">—</td></tr>
+          </tbody>
+        </table>`;
 
-      // BB width (20)
-      const win = 20;
-      const last20 = closes.slice(-win);
-      const sd = stdDev(last20);
-      const ma20 = last20.reduce((a,b)=>a+b,0)/Math.max(1,last20.length);
-      const bbWidth = (2*sd)/Math.max(1e-9, ma20); // normalized by price
-
-      // Percentile vs last 120 widths
-      const widths=[];
-      for(let i=win;i<=n;i++){
-        const seg = closes.slice(i-win,i);
-        const sd0=stdDev(seg); const ma0=seg.reduce((a,b)=>a+b,0)/seg.length;
-        widths.push((2*sd0)/Math.max(1e-9,ma0));
-      }
-      const sorted = widths.slice(-120).slice().sort((a,b)=>a-b);
-      const pctRank = sorted.length ? sorted.indexOf(sorted.find(v=>v>=bbWidth)) / sorted.length : 1;
-      const squeeze = pctRank <= 0.25;
-
-      // NR4 / NR7 cluster (range contraction)
-      const ranges = closes.map((c,i)=> i? Math.abs(c - closes[i-1]) : 0);
-      const last7 = ranges.slice(-7), last4 = ranges.slice(-4);
-      const nr4 = last4.every(r => r <= Math.min(...ranges.slice(-20)) * 1.10); // within 10% of 20d min range
-      const nr7 = last7.filter(r => r <= Math.min(...ranges.slice(-20)) * 1.20).length >= 5; // 5 of 7 near-min
-      const nrCluster = nr4 || nr7;
-
-      // Accumulation (up-vol vs down-vol over 10d)
-      let up=0, dn=0;
-      for(let i=Math.max(1,n-10); i<n; i++){
-        const v = volumes[i]||0;
-        if(closes[i] >= closes[i-1]) up+=v; else dn+=v;
-      }
-      const accRatio = (up||0) / Math.max(1, dn||1);
-      const accumulation = accRatio >= 1.2;
-
-      // Leadership (RS slope using ratio vs benchmark, last 20d)
-      const bc = benchCloses;
-      const m = Math.min(closes.length, bc.length);
-      const rsSeries = [];
-      for(let i=m-20;i<m;i++){
-        if(i>=0) rsSeries.push((closes[i]||1) / Math.max(1e-9, bc[i]||1));
-      }
-      const rsSlope = linRegSlope(rsSeries);
-      const leadership = rsSlope > 0;
-
-      // Location (≤10% under 30d high & above 50-DMA)
-      const window30 = closes.slice(-30);
-      const high30 = window30.length ? Math.max(...window30) : price;
-      const nearHigh = price/high30 - 1; // <= 10% under
-      const ma50Arr = smaArr(closes, 50);
-      const ma50 = ma50Arr[ma50Arr.length-1];
-      const above50 = price > (ma50||price);
-      const location = (nearHigh >= -0.10) && above50;
-
-      // Ignition watch (vol>1.5x 20d avg & day% > 3%)
-      const avgVol = volumes.slice(-20).reduce((a,b)=>a+b,0)/Math.max(1, Math.min(20, volumes.length));
-      const volVsAvg = (volumes[n-1]||0)/Math.max(1,avgVol||1);
-      const ignition = volVsAvg >= 1.5 && dayChg >= 0.03;
-
-      return {
-        price, bbWidth, squeeze, nrCluster, accRatio, accumulation,
-        rsSlope, leadership, nearHigh, above50, location, volVsAvg, dayChg, ignition
-      };
-    }
-
-    /* =============================
-       Intrinsic valuation (robust + light)
-       Uses Yahoo quoteSummary: income, cashflow, ratios if available.
-       ============================= */
-    function safeNum(x, d=0){ return (x==null || !isFinite(+x)) ? d : +x; }
-    function computeValuationFromFundies(f){
-      // Extract
-      const prof   = f?.quoteSummary?.result?.[0]?.financialData || {};
-      const priceD = f?.quoteSummary?.result?.[0]?.price || {};
-      const inc    = f?.quoteSummary?.result?.[0]?.incomeStatementHistory?.incomeStatementHistory || [];
-      const cflow  = f?.quoteSummary?.result?.[0]?.cashflowStatementHistory?.cashflowStatements || [];
-      const stats  = f?.quoteSummary?.result?.[0]?.defaultKeyStatistics || {};
-
-      const lastInc = inc?.[0] || {};
-      const revenue = safeNum(lastInc?.totalRevenue?.raw);
-      const opInc   = safeNum(lastInc?.operatingIncome?.raw);
-      const netInc  = safeNum(lastInc?.netIncome?.raw);
-      const shares  = safeNum(priceD?.sharesOutstanding?.raw) || safeNum(stats?.sharesOutstanding?.raw);
-
-      const fcfRaw  = safeNum(cflow?.[0]?.freeCashFlow?.raw);
-      const gMargin = safeNum(prof?.grossMargins?.raw, 0);        // 0..1
-      const oMargin = safeNum(prof?.operatingMargins?.raw, 0);    // 0..1
-      const pMargin = safeNum(prof?.profitMargins?.raw, 0);       // 0..1
-      const revG    = safeNum(prof?.revenueGrowth?.raw, 0);       // YoY
-
-      const price   = safeNum(priceD?.regularMarketPrice?.raw);
-      if(!revenue || !shares){ return { fair: price||0, multiple: 1.0, score: 50 }; }
-
-      // Quality (0..1): heavier on operating margin, then gross, then FCF margin, then profit
-      const fcfMargin = revenue ? (fcfRaw/revenue) : 0;
-      const Q = clamp( 0.4*oMargin + 0.25*gMargin + 0.2*fcfMargin + 0.15*pMargin, 0, 1);
-
-      // Growth clamp (-20%..60%)
-      const G = clamp(revG, -0.2, 0.6);
-
-      // Target P/S multiple. Base 1.0 scaled by quality & growth. Capped 15x to avoid absurdity.
-      const targetPS = clamp( 1.0 + 6.0*Q + 5.0*G, 0.2, 15.0);
-
-      const fairValueMktCap = revenue * targetPS;              // EV-ish, but OK for simplicity
-      const fairPerShare    = fairValueMktCap / Math.max(1,shares);
-      const multipleVsPrice = price ? (fairPerShare/price) : 1.0;
-
-      // Valuation score (0..100): blend of quality and undervaluation (favor fair>price)
-      const underval = clamp(multipleVsPrice-1, -0.8, 2.0);    // -80% .. +200%
-      const score = Math.round( clamp( 60*Q + 40*clamp(underval/2.0, -1, 1), 0, 1) * 100 );
-
-      return { fair: fairPerShare, multiple: multipleVsPrice, score };
-    }
-
-    /* =============================
-       Sparkline (for small trend strip)
-       ============================= */
-    function drawSparkline(el, series){
-      const W = el.clientWidth || 240, H = 44, P = 2;
-      if (!series?.length){ el.innerHTML=''; return; }
-      const n = series.length, mn = Math.min(...series), mx = Math.max(...series);
-      const x = i => P + (W-2*P) * (i/(n-1 || 1));
-      const y = v => (mx===mn) ? H/2 : (H - P - (H-2*P) * ((v - mn) / (mx - mn)));
-      let d = ''; series.forEach((v,i)=>{ d += (i? 'L':'M') + x(i) + ',' + y(v); });
-      const fill = `${d} L ${x(n-1)},${H-P} L ${x(0)},${H-P} Z`;
-      el.innerHTML = `
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-          <path class="fill" d="${fill}"></path>
-          <path class="line" d="${d}"></path>
-          <line class="axis" x1="0" y1="${H-P}" x2="${W}" y2="${H-P}"></line>
-        </svg>`;
-    }
-
-    /* =============================
-       News
-       ============================= */
-    function cleanNameForQuery(name){ return String(name || '').replace(/\(.*?\)/g,'').trim(); }
-    function relTime(d){
-      const t = new Date(d).getTime(); if(!isFinite(t)) return '';
-      const mins = Math.max(1, Math.round((Date.now() - t)/60000));
-      if (mins < 60) return `${mins}m`; const hrs = Math.round(mins/60);
-      if (hrs < 24) return `${hrs}h`; return `${Math.round(hrs/24)}d`;
-    }
-    async function fetchNewsItems(query){
-      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-      const xmlText = await getRaw(url);
-      const doc = new DOMParser().parseFromString(xmlText, "text/xml");
-      const items = [...doc.getElementsByTagName('item')].slice(0,3).map(node => {
-        const title = node.getElementsByTagName('title')[0]?.textContent || '';
-        const link  = node.getElementsByTagName('link')[0]?.textContent || '#';
-        const pub   = node.getElementsByTagName('pubDate')[0]?.textContent || '';
-        const source= node.getElementsByTagName('source')[0]?.textContent || '';
-        return { title, link, pub, source };
-      });
-      return items;
-    }
-    function renderNewsList(container, items){
-      if(!container) return;
-      if(!items?.length){
-        container.innerHTML = `<div class="news"><h3>Latest News</h3><div style="color:var(--muted)">—</div></div>`;
-        return;
-      }
-      container.innerHTML = `
-        <div class="news">
-          <h3>Latest News</h3>
-          <ul>
-            ${items.map(it => `
-              <li>
-                <a href="${it.link}" target="_blank" rel="noopener noreferrer">${it.title}</a>
-                ${it.source ? ` <span style="color:var(--muted);font-size:11px">(${it.source})</span>` : ''}
-                ${it.pub ? `<time>· ${relTime(it.pub)}</time>` : ''}
-              </li>
-            `).join('')}
-          </ul>
-        </div>`;
-    }
-    async function populateNewsByMount(mount, item){
-      const tkr = yTicker(item.symbol);
-      const name = cleanNameForQuery(item.name);
-      const query = `${tkr} stock OR ${name} stock`;
-      try{ renderNewsList(mount, await fetchNewsItems(query)); }
-      catch(e){ renderNewsList(mount, []); console.error('News error', item, e); }
-    }
-
-    /* =============================
-       Build rows (only right column changed)
-       ============================= */
-    async function fetchBenchmarkCloses(){
-      const b = await yahooChart(BENCHMARK, '6mo', '1d');
-      return (b?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || []).filter(v=>v!=null);
-    }
-
-    async function getClosesVolumes(ticker){
-      const ch = await yahooChart(ticker, '1y', '1d');
-      const c = ch?.chart?.result?.[0];
-      const q = c?.indicators?.quote?.[0];
-      const closes  = (q?.close  || []).filter(v=>v!=null);
-      const volumes = (q?.volume || []).filter(v=>v!=null);
-      return { closes, volumes };
-    }
-
-    function buildRightPreBreakoutValuation(rid, pre, val){
-      const right=document.createElement('div'); right.className='card';
-
-      const strength=document.createElement('div'); strength.className='strength-badge';
-      strength.innerHTML = `Pre-Breakout Score: <strong>${
-        Math.round(
-          (pre.squeeze?1:0)*0.22 +
-          (pre.nrCluster?1:0)*0.18 +
-          (pre.accumulation?1:0)*0.18 +
-          (pre.leadership?1:0)*0.18 +
-          (pre.location?1:0)*0.14 +
-          (pre.ignition?1:0)*0.10
-        *100) }</strong>`; // indicative chip
-      right.appendChild(strength);
-
-      const hR=document.createElement('h2'); hR.textContent='Pre-Breakout + Valuation';
-      right.appendChild(hR);
-
-      const tbl=document.createElement('table');
-      tbl.innerHTML = `
-        <thead><tr><th>Pre-Breakout Metric</th><th class="val">—</th><th class="sig">Signal</th></tr></thead>
-        <tbody>
-          <tr><td>Squeeze (BB width low)</td><td class="val">${(pre.bbWidth*100).toFixed(1)}%</td><td class="sig ${pre.squeeze?'ok':'ko'}">${pre.squeeze?'✅':'—'}</td></tr>
-          <tr><td>NR4 / NR7 cluster</td><td class="val">Range comp</td><td class="sig ${pre.nrCluster?'ok':'ko'}">${pre.nrCluster?'✅':'—'}</td></tr>
-          <tr><td>Accumulation (up-vol / down-vol)</td><td class="val">${pre.accRatio.toFixed(2)}x</td><td class="sig ${pre.accumulation?'ok':'ko'}">${pre.accumulation?'✅':'—'}</td></tr>
-          <tr><td>Leadership (RS slope, 20d)</td><td class="val">${pre.rsSlope.toFixed(4)}</td><td class="sig ${pre.leadership?'ok':'ko'}">${pre.leadership?'✅':'—'}</td></tr>
-          <tr><td>Location (≤10% under 30d high &gt; 50-DMA)</td><td class="val">${(pre.nearHigh*100).toFixed(1)}%</td><td class="sig ${pre.location?'ok':'ko'}">${pre.location?'✅':'—'}</td></tr>
-          <tr><td>Ignition watch (vol &gt;1.5×, day% &gt;3%)</td><td class="val">${pre.volVsAvg.toFixed(2)}× / ${(pre.dayChg*100).toFixed(1)}%</td><td class="sig ${pre.ignition?'ok':'ko'}">${pre.ignition?'✅':'—'}</td></tr>
-        </tbody>`;
-      right.appendChild(tbl);
-
-      // Chips row
-      const chips = document.createElement('div'); chips.className='chips';
-      const addChip = (label, ok, warn=false)=> {
-        const c=document.createElement('span'); c.className='chip'+(ok?' ok':(warn?' warn':'')); c.textContent=label; chips.appendChild(c);
-      };
-      addChip('ATR% low (squeeze)', pre.squeeze);
-      addChip('NR4/NR7 cluster', pre.nrCluster);
-      addChip('UpVol>DownVol', pre.accumulation);
-      addChip('RS slope↑', pre.leadership);
-      addChip('≤10% under 30-high', pre.nearHigh>=-0.10);
-      addChip('>50-DMA', pre.above50);
-      addChip('Ignition watch', pre.ignition, pre.ignition);
-
-      right.appendChild(chips);
-
-      // Valuation block
-      const vtbl=document.createElement('table');
-      vtbl.style.marginTop='10px';
-      vtbl.innerHTML = `
-        <thead><tr><th>Intrinsic Valuation</th><th class="val">Value</th></tr></thead>
-        <tbody>
-          <tr><td>Fair Value / Share</td><td class="val">$${isFinite(val.fair)?val.fair.toFixed(2):'—'}</td></tr>
-          <tr><td>FV Multiple vs Price</td><td class="val">${isFinite(val.multiple)?val.multiple.toFixed(2)+'×':'—'}</td></tr>
-          <tr><td>Valuation Score</td><td class="val">${isFinite(val.score)?(val.score|0)+'/100':'—'}</td></tr>
-        </tbody>`;
-      right.appendChild(vtbl);
-
-      // News mount
-      const newsBox = document.createElement('div');
-      newsBox.id = `${cellId(rid,'news')}`;
-      newsBox.className = 'news';
-      right.appendChild(newsBox);
-
-      return right;
-    }
-
-    async function buildRow(item, _idx, benchCloses){
-      const rid = rowIdFromSymbol(item.symbol);
-
-      // LEFT — TradingView
-      const left=document.createElement('div'); left.className='card';
-      const hL=document.createElement('h2'); hL.textContent=`${item.name} — Price & Chart`;
-      const cL=document.createElement('div'); cL.className='chart';
-      left.appendChild(hL); left.appendChild(cL);
-
-      // MIDDLE — Trends
-      const mid=document.createElement('div'); mid.className='card';
-      const hM=document.createElement('h2'); hM.textContent=`Google Trends — “${item.trendTerm}” (1m, Worldwide)`;
-      const cM=document.createElement('div'); cM.className='trend'; cM.id=`trend-${rid}`;
-      mid.appendChild(hM); mid.appendChild(cM);
-
-      // Fetch arrays
-      let closes=[], volumes=[];
-      try{ const hv = await getClosesVolumes(yTicker(item.symbol)); closes=hv.closes; volumes=hv.volumes; }
-      catch(e){ console.error('calc error', item.symbol, e); }
-
-      // Pre-breakout + valuation
-      let pre = { squeeze:false,nrCluster:false,accumulation:false,leadership:false,location:false,ignition:false,
-                  bbWidth:0, accRatio:1, rsSlope:0, nearHigh:-1, above50:false, volVsAvg:1, dayChg:0, price:0 };
-      if(closes.length && volumes.length){
-        pre = computePreBreakout(closes, volumes, benchCloses);
-      }
-
-      let val = { fair: NaN, multiple: NaN, score: NaN };
-      try{
-        const fd = await yahooFundamentals(yTicker(item.symbol));
-        val = computeValuationFromFundies(fd);
-      }catch(e){ console.warn('valuation error', item.symbol, e); }
-
-      // RIGHT — build UI
-      const right = buildRightPreBreakoutValuation(rid, pre, val);
-
-      // Append columns
       grid.appendChild(left); grid.appendChild(mid); grid.appendChild(right);
 
-      // Embeds
-      renderTradingView(cL, item.symbol);
-      renderTrends(cM, item.trendTerm);
-
-      // Tiny sparkline in right block (30 bars)
-      const sparkMount=document.createElement('div');
-      sparkMount.className='spark';
-      const rowSpark = document.createElement('div'); rowSpark.style.marginTop='8px';
-      rowSpark.appendChild(sparkMount);
-      right.appendChild(rowSpark);
-      drawSparkline(sparkMount, closes.slice(-30));
-
-      // Earnings async
-      (async ()=>{
-        try{
-          const ej = await yahooEarnings(yTicker(item.symbol));
-          const raw = ej?.quoteSummary?.result?.[0]?.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
-          const chip=document.createElement('span'); chip.className='chip'; chip.textContent='Earnings: ' + (raw? new Date(raw*1000).toISOString().slice(0,10):'—');
-          right.querySelector('.chips').appendChild(chip);
-        }catch{}
-      })();
-
-      // News
-      populateNewsByMount(document.getElementById(cellId(rid,'news')), item);
+      renderTradingView(left.querySelector('.chart'), item.symbol);
+      renderTrends(mid.querySelector('.trend'), item.trendTerm);
     }
 
-    async function renderAll(){
+    function renderAll(){
       grid.innerHTML='';
-      let bench=[];
-      try{ bench = await fetchBenchmarkCloses(); }catch(e){ console.error('benchmark error', e); }
-      const list = getWatchlist();
-      for(const it of list){ await buildRow(it, 0, bench); }
-      updateTimestamp();
+      const list=getWatchlist();
+      list.forEach(it=>buildRow(it));
+      document.getElementById('last-updated').textContent="Last updated: "+new Date().toLocaleTimeString();
     }
 
-    /* =============================
-       Controls (same behavior)
-       ============================= */
     function addStock(){
-      const s = document.getElementById('in-symbol').value.trim();
-      const n = document.getElementById('in-name').value.trim() || s;
-      const t = document.getElementById('in-trend').value.trim() || n;
-      if(!s){ alert('Enter symbol in EXCHANGE:TICKER format (e.g., NASDAQ:MVIS)'); return; }
-      const list = getWatchlist();
-      const key = yTicker(s);
-      const idx = list.findIndex(x => yTicker(x.symbol) === key);
-      if(idx === -1) list.push({ symbol:s, name:n, trendTerm:t });
-      else           list[idx] = { symbol:s, name:n, trendTerm:t };
-      setWatchlist(list);
-      renderAll();
-      document.getElementById('in-symbol').value='';
-      document.getElementById('in-name').value='';
-      document.getElementById('in-trend').value='';
-    }
-    function removeStockBySymbol(symbol){
-      const key = yTicker(symbol);
-      const list = getWatchlist().filter(x => yTicker(x.symbol) !== key);
-      setWatchlist(list);
-      renderAll();
-    }
-    function resetDefaults(){ setWatchlist(DEFAULT_WATCHLIST.slice()); renderAll(); }
-
-    function updateTimestamp(){
-      const ts = new Date().toLocaleTimeString();
-      const el = document.getElementById('last-updated');
-      if (!el) return;
-      el.textContent = `Last updated: ${ts}`;
-      el.style.color = 'var(--good)';
-      setTimeout(()=>{ el.style.color='var(--muted)'; }, 1500);
+      const s=document.getElementById('in-symbol').value.trim();
+      const n=document.getElementById('in-name').value.trim()||s;
+      const t=document.getElementById('in-trend').value.trim()||n;
+      if(!s) return alert("Enter symbol in EXCHANGE:TICKER format");
+      const list=getWatchlist();
+      const idx=list.findIndex(x=>yTicker(x.symbol)===yTicker(s));
+      if(idx===-1) list.push({symbol:s,name:n,trendTerm:t});
+      else list[idx]={symbol:s,name:n,trendTerm:t};
+      setWatchlist(list); renderAll();
     }
 
-    function refreshNow(){ renderAll(); }
+    document.getElementById('btn-add').addEventListener('click',addStock);
+    document.getElementById('btn-reset').addEventListener('click',()=>{setWatchlist(DEFAULT_WATCHLIST);renderAll();});
+    document.getElementById('btn-refresh').addEventListener('click',renderAll);
 
-    document.getElementById('btn-add').addEventListener('click', addStock);
-    document.getElementById('btn-reset').addEventListener('click', resetDefaults);
-    document.getElementById('btn-refresh').addEventListener('click', refreshNow);
-
-    // Initial
     renderAll();
-
-    // Auto
-    setInterval(renderAll, REFRESH_MS);
-    setInterval(async () => {
-      const list = getWatchlist();
-      list.forEach((it) => {
-        const rid = rowIdFromSymbol(it.symbol);
-        const mount = document.getElementById(cellId(rid,'news'));
-        if (mount) populateNewsByMount(mount, it);
-      });
-    }, NEWS_REFRESH_MS);
   </script>
 </body>
 </html>
