@@ -148,13 +148,9 @@ async function fetchFearGreed(){
   }catch(e){
     console.error('FNG worker error', e);
   }
-  // fallback: stock composite if you like
-  try{
-    const alt = await fetchFGStockComposite();
-    if (alt) return alt;
-  }catch(e){}
   return null;
 }
+
 
 
 
@@ -162,7 +158,7 @@ async function fetchFearGreed(){
 async function fetchValuation(ticker){
   // 1) Try summary (richer fields)
   try{
-const r = await fetch(`${API_BASE}api/yahoo/summary?symbol=${encodeURIComponent(ticker)}`);
+const r  = await fetch(`${API_BASE}api/yahoo/summary?symbol=${encodeURIComponent(ticker)}`);
     if (r.ok) {
       const j = await r.json();
       const d = j?.quoteSummary?.result?.[0];
