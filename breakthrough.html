@@ -223,7 +223,14 @@ async function fetchValueTargets(ticker){
 
     // Analyst values (fallback gracefully if fields missing)
     const analystMean   = toNum(pt?.targetMean ?? pt?.targetConsensus);
-    const analystMedian = toNum(pt?.targetMedian ?? pt?.targetLow && pt?.targetHigh ? (pt.targetLow + pt.targetHigh)/2 : null);
+    const analystMedian = toNum(
+  (pt?.targetMedian != null)
+    ? pt.targetMedian
+    : (pt?.targetLow != null && pt?.targetHigh != null)
+        ? (Number(pt.targetLow) + Number(pt.targetHigh)) / 2
+        : null
+);
+
 
     // Model fair value (simple, robust composite)
     // We blend a P/E-based fair value with a P/S-based fair value.
