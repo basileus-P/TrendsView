@@ -148,6 +148,11 @@ async function fetchFearGreed(){
   }catch(e){
     console.error('FNG worker error', e);
   }
+  // fallback to composite (already in your file)
+  try{
+    const alt = await fetchFGStockComposite();
+    if (alt) return alt;
+  }catch(e){}
   return null;
 }
 
@@ -156,12 +161,41 @@ async function fetchFearGreed(){
 
 
 async function fetchValuation(ticker){
-  // 1) Try summary (richer fields)
+  // 1) Quote first (reliable)
   try{
-const r  = await fetch(`${API_BASE}api/yahoo/summary?symbol=${encodeURIComponent(ticker)}`);
+    const r = await fetch(`${API_BASE}api/yahoo/quote?symbol=${encodeURIComponent(ticker)}`);
     if (r.ok) {
       const j = await r.json();
-      const d = j?.quoteSummary?.result?.[0];
+      const q  = j?.quoteResponse?.result?.[0];
+      if (q){
+        const pe  = q.trailingPE ?? null;
+        const ps  = q.priceToSalesTrailing12Months ?? null;
+        const mcap = q.marketCap ? `$${Math.round(q.marketCap/1e9)}B` : null;
+        let evs = null;
+
+        // 2) Try to enrich with summary (EV/S) if available
+        try{
+          const r2 = await fetch(`${API_BASE}api/yahoo/summary?symbol=${encodeURIComponent(ticker)}`);
+          if (r2.ok) {
+            const j2 = await r2.json();
+            const d = j2?.quoteSummary?.result?.[0];
+            evs = d?.defaultKeyStatistics?.enterpriseToRevenue?.raw
+               ?? d?.financialData?.enterpriseToRevenue?.raw
+               ?? null;
+          }
+        }catch{}
+
+        return { pe, ps, evs, mcap };
+      }
+    }
+  }catch(e){ console.error("quote fetch err", e); }
+
+  // 3) Last resort: summary only
+  try{
+    const r3 = await fetch(`${API_BASE}api/yahoo/summary?symbol=${encodeURIComponent(ticker)}`);
+    if (r3.ok) {
+      const j3 = await r3.json();
+      const d  = j3?.quoteSummary?.result?.[0];
       if (d){
         const pe  = d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null;
         const ps  = d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null;
@@ -170,23 +204,7 @@ const r  = await fetch(`${API_BASE}api/yahoo/summary?symbol=${encodeURIComponent
         return { pe, ps, evs, mcap };
       }
     }
-  }catch{}
-
-  // 2) Fallback to quote
-  try{
-const r2 = await fetch(`${API_BASE}api/yahoo/quote?symbol=${encodeURIComponent(ticker)}`);
-    if (r2.ok) {
-      const j2 = await r2.json();
-      const q  = j2?.quoteResponse?.result?.[0];
-      if (q){
-        const pe  = q.trailingPE ?? null;
-        const ps  = q.priceToSalesTrailing12Months ?? null;
-        const evs = null; // not available here
-        const mcap = q.marketCap ? `$${Math.round(q.marketCap/1e9)}B` : null;
-        return { pe, ps, evs, mcap };
-      }
-    }
-  }catch{}
+  }catch(e){ console.error("summary fetch err", e); }
 
   return null;
 }
