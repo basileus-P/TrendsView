@@ -45,6 +45,48 @@
 <script type="module">
   const FMP_KEY = "CnZ2WdgFKH9JQxlqxKNvBg8rHbe9wvnN"; // free key that works immediately
 const API_FMP = "https://financialmodelingprep.com/api/v3";
+// ---- FMP client: throttle, retry (429), and in-memory cache ----
+const FMP = {
+  base: API_FMP,
+  key: FMP_KEY,
+  cache: new Map(),        // url -> { t, v }
+  chain: Promise.resolve(),// serialize calls
+  lastAt: 0,
+  async get(path, ttlMs = 60000) {
+    const url = `${this.base}${path}${path.includes('?') ? '&' : '?'}apikey=${this.key}`;
+    const now = Date.now();
+    const cached = this.cache.get(url);
+    if (cached && (now - cached.t) < ttlMs) return cached.v;
+
+    // queue + minimum gap (free plan is sensitive)
+    const minGap = 350; // ms between calls
+    this.chain = this.chain.then(async () => {
+      const wait = Math.max(0, minGap - (Date.now() - this.lastAt));
+      if (wait) await new Promise(r => setTimeout(r, wait));
+      this.lastAt = Date.now();
+    });
+    await this.chain;
+
+    // fetch with backoff on 429/503
+    let tries = 3, back = 500, lastTxt = '';
+    while (tries--) {
+      const res = await fetch(url);
+      const txt = await res.text(); lastTxt = txt;
+      if (res.ok) {
+        const data = txt ? JSON.parse(txt) : null;
+        this.cache.set(url, { t: Date.now(), v: data });
+        return data;
+      }
+      if (res.status === 429 || res.status === 503) {
+        await new Promise(r => setTimeout(r, back));
+        back = Math.min(2000, Math.round(back * 1.8));
+        continue;
+      }
+      throw new Error(`FMP ${res.status}: ${txt.slice(0,120)}`);
+    }
+    throw new Error(`FMP rate-limited: ${lastTxt.slice(0,120)}`);
+  }
+};
 
 const WATCHLIST=[
 { ticker:'PLTR', name:'Palantir', exchange:'NYSE', trendsQuery:'Palantir' },
@@ -202,17 +244,12 @@ async function fetchFearGreed(){
 
 async function fetchValueTargets(ticker){
   try{
-    const [qRes, profRes, kmRes, ptRes] = await Promise.all([
-      fetch(`${API_FMP}/quote/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`),
-      fetch(`${API_FMP}/profile/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`),
-      fetch(`${API_FMP}/key-metrics-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`),
-      fetch(`${API_FMP}/price-target?symbol=${encodeURIComponent(ticker)}&apikey=${FMP_KEY}`)
+    const [qArr, pArr, kArr, ptArr] = await Promise.all([
+      FMP.get(`/quote/${encodeURIComponent(ticker)}`,                      15000),
+      FMP.get(`/profile/${encodeURIComponent(ticker)}`,                    10*60*1000),
+      FMP.get(`/key-metrics-ttm/${encodeURIComponent(ticker)}`,           10*60*1000),
+      FMP.get(`/price-target?symbol=${encodeURIComponent(ticker)}`,       10*60*1000)
     ]);
-
-    if(!qRes.ok || !profRes.ok || !kmRes.ok) return null;
-
-    const [qArr, pArr, kArr] = [await qRes.json(), await profRes.json(), await kmRes.json()];
-    const ptArr = ptRes.ok ? await ptRes.json() : [];
 
     const quote = Array.isArray(qArr) && qArr[0] ? qArr[0] : {};
     const prof  = Array.isArray(pArr) && pArr[0] ? pArr[0] : {};
@@ -221,16 +258,11 @@ async function fetchValueTargets(ticker){
 
     const price = Number(quote.price ?? quote.previousClose ?? 0);
 
-    // ---- Analyst values (tolerant field names)
+    // Analyst values (robust field fallbacks)
     const toNum = x => { const n=Number(x); return Number.isFinite(n)? n : null; };
-
     const analystMean = toNum(
-      pt.targetMean ??
-      pt.targetConsensus ??
-      pt.consensus ??
-      pt.mean ?? null
+      pt.targetMean ?? pt.targetConsensus ?? pt.consensus ?? pt.mean ?? null
     );
-
     const analystMedian = toNum(
       (pt.targetMedian != null) ? pt.targetMedian
       : (pt.targetLow != null && pt.targetHigh != null)
@@ -238,27 +270,17 @@ async function fetchValueTargets(ticker){
         : null
     );
 
-    // ---- Model fair value: sector-aware PE/PS anchors
+    // Sector-aware anchors
     const epsTTM = toNum(km.netIncomePerShareTTM ?? km.epsTTM ?? km.epsDilutedTTM);
     const rpsTTM = toNum(km.revenuePerShareTTM);
-
     const sector = (prof.sector || "").toLowerCase();
-    // conservative defaults
     let peAnchor = 20, psAnchor = 3;
-
-    if (sector.includes("software") || sector.includes("internet") || sector.includes("it")) {
-      peAnchor = 25; psAnchor = 4;
-    } else if (sector.includes("semiconductor")) {
-      peAnchor = 22; psAnchor = 3.5;
-    } else if (sector.includes("financial")) {
-      peAnchor = 12; psAnchor = 2;
-    } else if (sector.includes("utilities")) {
-      peAnchor = 15; psAnchor = 2;
-    } else if (sector.includes("energy")) {
-      peAnchor = 12; psAnchor = 1.5;
-    } else if (sector.includes("health")) {
-      peAnchor = 18; psAnchor = 3;
-    }
+    if (sector.includes("software") || sector.includes("internet") || sector.includes("it")) { peAnchor=25; psAnchor=4; }
+    else if (sector.includes("semiconductor")) { peAnchor=22; psAnchor=3.5; }
+    else if (sector.includes("financial")) { peAnchor=12; psAnchor=2; }
+    else if (sector.includes("utilities")) { peAnchor=15; psAnchor=2; }
+    else if (sector.includes("energy")) { peAnchor=12; psAnchor=1.5; }
+    else if (sector.includes("health")) { peAnchor=18; psAnchor=3; }
 
     const fairPE = (epsTTM>0) ? epsTTM * peAnchor : null;
     const fairPS = (rpsTTM>0) ? rpsTTM * psAnchor : null;
@@ -274,6 +296,7 @@ async function fetchValueTargets(ticker){
     return null;
   }
 }
+
 
 
   function toNum(x){ const n=Number(x); return Number.isFinite(n)?n:null; }
@@ -319,23 +342,15 @@ ${cmpChip('Model Fair', t.modelFair)}
 
 async function fetchValuation(ticker){
   try {
-    const profUrl = `${API_FMP}/profile/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
-    const kmUrl   = `${API_FMP}/key-metrics-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
-    const ratioUrl= `${API_FMP}/ratios-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
-
-    const [profRes, kmRes, ratioRes] = await Promise.all([
-      fetch(profUrl), fetch(kmUrl), fetch(ratioUrl)
+    const [prof, km, ratio] = await Promise.all([
+      FMP.get(`/profile/${encodeURIComponent(ticker)}`,              10*60*1000), // 10m
+      FMP.get(`/key-metrics-ttm/${encodeURIComponent(ticker)}`,     10*60*1000),
+      FMP.get(`/ratios-ttm/${encodeURIComponent(ticker)}`,          10*60*1000),
     ]);
 
-    if(!profRes.ok || !kmRes.ok || !ratioRes.ok) return null;
-
-    const prof = await profRes.json();
-    const km   = await kmRes.json();
-    const ratio= await ratioRes.json();
-
-    const p0 = Array.isArray(prof) && prof[0] ? prof[0] : {};
-    const k0 = Array.isArray(km)   && km[0]   ? km[0]   : {};
-    const r0 = Array.isArray(ratio)&& ratio[0]? ratio[0]: {};
+    const p0 = Array.isArray(prof)  && prof[0]  ? prof[0]  : {};
+    const k0 = Array.isArray(km)    && km[0]    ? km[0]    : {};
+    const r0 = Array.isArray(ratio) && ratio[0] ? ratio[0] : {};
 
     const mcap = p0.mktCap ? `$${Math.round(p0.mktCap/1e9)}B` : null;
     const pe   = k0.peTTM ?? r0.peRatioTTM ?? null;
@@ -379,17 +394,12 @@ WATCHLIST.forEach(makeRow);
   // ---------- Breakthrough signal engine ----------
 async function fetchSignals(ticker){
   try{
-    // 1) Quote for price/volume
-    const qRes = await fetch(`${API_FMP}/quote/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`);
-    if(!qRes.ok) return null;
-    const qArr = await qRes.json();
+    const [qArr, hist] = await Promise.all([
+      FMP.get(`/quote/${encodeURIComponent(ticker)}`,                         15000),      // 15s
+      FMP.get(`/historical-price-full/${encodeURIComponent(ticker)}?timeseries=60&serietype=line`, 60*60*1000) // 1h
+    ]);
     const q = Array.isArray(qArr) && qArr[0] ? qArr[0] : {};
-
-    // 2) Recent history for MA20, 30d high, 5d change
-    const hRes = await fetch(`${API_FMP}/historical-price-full/${encodeURIComponent(ticker)}?timeseries=60&serietype=line&apikey=${FMP_KEY}`);
-    if(!hRes.ok) return null;
-    const h = await hRes.json();
-    const closes = (h?.historical||[]).map(d=>Number(d.close)).filter(Number.isFinite);
+    const closes = (hist?.historical||[]).map(d=>Number(d.close)).filter(Number.isFinite);
 
     const price = Number(q.price ?? q.previousClose ?? closes.at(-1) ?? 0);
     const volume = Number(q.volume ?? 0);
@@ -401,19 +411,18 @@ async function fetchSignals(ticker){
     const fiveAgo = closes.slice(-6, -5)[0];
     const chg5d = (Number.isFinite(fiveAgo) && fiveAgo>0) ? (price/fiveAgo - 1) : null;
 
-    // ---- Scores 0..1 ----
     const clamp=x=>Math.max(0,Math.min(1,x));
     const volScore = (volume>0 && avgVolume>0) ? clamp((volume/avgVolume - 1)/1) : 0;   // 2x avg -> 1
     const momScore = (ma20? clamp((price/ma20 - 1)/0.10): 0);                            // +10% over MA20 -> 1
     const brkScore = (Number.isFinite(high30d)? (price>=high30d?1: clamp((price-(high30d*0.97))/(high30d*0.03))):0); // within 3% of 30d high
 
-    // ---- Combine (weights) into 0..100
     const score01 = 0.35*volScore + 0.35*momScore + 0.30*brkScore;
     const score = Math.round(score01*100);
 
     return { price, volume, avgVolume, ma20, high30d, chg5d, volScore, momScore, brkScore, score };
   }catch(e){ console.error('signals error', e); return null; }
 }
+
 
 function renderSignals(left, sig){
 const old = left.querySelector('.sig');
