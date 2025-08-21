@@ -138,39 +138,35 @@ const API_BASE = "https://raspy-bush-72eb.ramanauskas-j.workers.dev/"; // <- rep
   document.getElementById('trendTime').addEventListener('change',e=>{ state.trendTime=e.target.value; refreshTrends(); });
   function refreshTrends(){ state.rows.forEach(r=>{ r.tFrame.src=trendSrc(r.data.trendsQuery||r.data.name); }); }
 
- async function fetchFearGreed(){
-  try{
-    const r = await fetch(`${API_BASE}/api/fng`);
-    if(!r.ok) return null;
-    const j = await r.json();
-    const score = Number(j?.score);
-    if (Number.isFinite(score)) return { value: score, source: 'CNN' };
-  }catch{}
-  return null;
-}
+async function fetchFearGreed() {
+  try {
+    const html = await fetch(
+      'https://r.jina.ai/http://edition.cnn.com/markets/fear-and-greed'
+    ).then(r => r.text());
 
-
-  // 2) CNN HTML page via reader — parse the number from markup
-  try{
-    const html = await fetch('https://r.jina.ai/http://edition.cnn.com/markets/fear-and-greed').text();
     const m =
       /dial-number[^>]*>(\d{1,3})/i.exec(html) ||
       /Fear\s*&\s*Greed[^\d]*(\d{1,3})/i.exec(html) ||
       /"score"\s*:\s*(\d{1,3})/i.exec(html);
+
     if (m) {
       const v = Math.max(0, Math.min(100, parseInt(m[1], 10)));
-      return { value:v, source:'CNN' };
+      return { value: v, source: 'CNN' };
     }
-  }catch{}
+  } catch (e) {
+    console.error('FNG fetch error', e);
+  }
 
-  // 3) Fallback: stock-only composite (VIX + ^CPC)
-  try{
+  try {
     const alt = await fetchFGStockComposite();
     if (alt) return alt;
-  }catch{}
+  } catch (e) {
+    console.error('Alt FNG error', e);
+  }
 
   return null;
 }
+
 
 
 async function fetchValuation(ticker){
