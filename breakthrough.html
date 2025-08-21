@@ -43,27 +43,36 @@
   <div id="table" class="grid"></div>
 
 <script type="module">
-  const WATCHLIST=[
-    { ticker:'PLTR', name:'Palantir', exchange:'NYSE', trendsQuery:'Palantir' },
-    { ticker:'QSI', name:'Quantum-Si', exchange:'NASDAQ', trendsQuery:'Quantum-Si' },
-    { ticker:'APLD', name:'Applied Digital', exchange:'NASDAQ', trendsQuery:'Applied Digital' }
-  ];
+const WATCHLIST=[
+{ ticker:'PLTR', name:'Palantir', exchange:'NYSE', trendsQuery:'Palantir' },
+{ ticker:'QSI', name:'Quantum-Si', exchange:'NASDAQ', trendsQuery:'Quantum-Si' },
+{ ticker:'APLD', name:'Applied Digital', exchange:'NASDAQ', trendsQuery:'Applied Digital' }
+];
+
 
 const state = { rows:[], range:'12M', geo:'US', trendTime:'today 1-m' };
 const table = document.getElementById('table');
-const API_BASE = "https://raspy-bush-72eb.ramanauskas-j.workers.dev/"; // <- replace
 
-  const fngVal=document.getElementById('fngVal');
-  const needle=document.getElementById('needle');
-  const fngSrc=document.getElementById('fngSrc');
 
-  function setFNG(v,src){
-    needle.style.transform=`rotate(${ -90 + (v*1.8) }deg)`;
-    fngVal.textContent=v;
-    fngSrc.textContent=src||'';
-  }
+// Using FMP demo key — no setup needed yet
+const FMP_KEY = "demo";
+const API_FMP = "https://financialmodelingprep.com/api/v3";
 
-  (async()=>{ const live=await fetchFearGreed(); if(live){ setFNG(live.value, live.source); } })();
+
+const fngVal=document.getElementById('fngVal');
+const needle=document.getElementById('needle');
+const fngSrc=document.getElementById('fngSrc');
+
+
+function setFNG(v,src){
+needle.style.transform=`rotate(${ -90 + (v*1.8) }deg)`;
+fngVal.textContent=v;
+fngSrc.textContent=src||'';
+}
+
+
+(async()=>{ const live=await fetchFearGreed(); if(live){ setFNG(live.value, live.source); } })();
+
 
   function tvMiniConfig(ticker){ return { symbol:ticker, width:'100%', height:300, locale:'en', dateRange:state.range, colorTheme:'dark', isTransparent:true, autosize:true }; }
   function safeJSON(obj){ return JSON.stringify(obj).replace(/</g,'\\u003c').replace(/>/g,'\\u003e'); }
@@ -139,124 +148,63 @@ const API_BASE = "https://raspy-bush-72eb.ramanauskas-j.workers.dev/"; // <- rep
   function refreshTrends(){ state.rows.forEach(r=>{ r.tFrame.src=trendSrc(r.data.trendsQuery||r.data.name); }); }
 
 async function fetchFearGreed(){
-  try{
-    const r = await fetch(`${API_BASE}api/fng`);
-    if(!r.ok) return null;
-    const j = await r.json();
-    const score = Number(j?.score);
-    if (Number.isFinite(score)) return { value: score, source: 'CNN' };
-  }catch(e){
-    console.error('FNG worker error', e);
-  }
-  // fallback to composite (already in your file)
-  try{
-    const alt = await fetchFGStockComposite();
-    if (alt) return alt;
-  }catch(e){}
-  return null;
+try {
+const r = await fetch("https://production.dataviz.cnn.io/index/fearandgreed/score");
+if (r.ok){
+const j = await r.json();
+const score = j?.fear_and_greed?.score ?? j?.score;
+if (Number.isFinite(score)) return { value: score, source: "CNN" };
 }
-
-
-
+}catch(e){ console.error("FNG fetch error", e); }
+return null;
+}
 
 
 async function fetchValuation(ticker){
-  await new Promise(r => setTimeout(r, 150 + Math.random()*200));
-  // 1) Quote first (reliable)
-  try{
-    const r = await fetch(`${API_BASE}api/yahoo/quote?symbol=${encodeURIComponent(ticker)}`);
-    if (r.ok) {
-      const j = await r.json();
-      const q  = j?.quoteResponse?.result?.[0];
-      if (q){
-        const pe  = q.trailingPE ?? null;
-        const ps  = q.priceToSalesTrailing12Months ?? null;
-        const mcap = q.marketCap ? `$${Math.round(q.marketCap/1e9)}B` : null;
-        let evs = null;
+try{
+const profUrl = `${API_FMP}/profile/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
+const kmUrl = `${API_FMP}/key-metrics-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
+const [profRes, kmRes] = await Promise.all([fetch(profUrl), fetch(kmUrl)]);
+if(!profRes.ok || !kmRes.ok) return null;
 
-        // 2) Try to enrich with summary (EV/S) if available
-        try{
-          const r2 = await fetch(`${API_BASE}api/yahoo/summary?symbol=${encodeURIComponent(ticker)}`);
-          if (r2.ok) {
-            const j2 = await r2.json();
-            const d = j2?.quoteSummary?.result?.[0];
-            evs = d?.defaultKeyStatistics?.enterpriseToRevenue?.raw
-               ?? d?.financialData?.enterpriseToRevenue?.raw
-               ?? null;
-          }
-        }catch{}
 
-        return { pe, ps, evs, mcap };
-      }
-    }
-  }catch(e){ console.error("quote fetch err", e); }
+const prof = await profRes.json();
+const km = await kmRes.json();
+const p0 = Array.isArray(prof) && prof[0] ? prof[0] : {};
+const k0 = Array.isArray(km) && km[0] ? km[0] : {};
 
-  // 3) Last resort: summary only
-  try{
-    const r3 = await fetch(`${API_BASE}api/yahoo/summary?symbol=${encodeURIComponent(ticker)}`);
-    if (r3.ok) {
-      const j3 = await r3.json();
-      const d  = j3?.quoteSummary?.result?.[0];
-      if (d){
-        const pe  = d.summaryDetail?.trailingPE?.raw ?? d.defaultKeyStatistics?.trailingPE?.raw ?? null;
-        const ps  = d.summaryDetail?.priceToSalesTrailing12Months?.raw ?? null;
-        const evs = d.defaultKeyStatistics?.enterpriseToRevenue?.raw ?? d.financialData?.enterpriseToRevenue?.raw ?? null;
-        const mcap = d.price?.marketCap?.fmt ?? (d.price?.marketCap?.raw ? `$${Math.round(d.price.marketCap.raw/1e9)}B` : null);
-        return { pe, ps, evs, mcap };
-      }
-    }
-  }catch(e){ console.error("summary fetch err", e); }
 
-  return null;
+const mcap = p0.mktCap ? `$${Math.round(p0.mktCap/1e9)}B` : null;
+const pe = k0.peTTM ?? null;
+const ps = k0.priceToSalesTTM ?? null;
+const evs = k0.enterpriseValueOverRevenueTTM ?? null;
+
+
+return { mcap, pe, ps, evs };
+}catch(e){ console.error("Valuation fetch error", e); return null; }
 }
 
-  function renderValuation(left, v){
-    const m=left.querySelector('[data-metrics]');
-    if(!m) return;
-    m.innerHTML='';
-    const add=(k,val)=>{
-      if(val==null) return;
-      const d=document.createElement('div');
-      d.style.display='flex';
-      d.style.justifyContent='space-between';
-      d.innerHTML=`<span>${k}</span><b>${typeof val==='number'? Number(val.toFixed(2)) : val}</b>`;
-      m.appendChild(d);
-    };
-    add('MCap', v.mcap);
-    add('P/E', v.pe);
-    add('P/S', v.ps);
-    add('EV/S', v.evs);
-  }
 
-  WATCHLIST.forEach(makeRow);
-
-async function fetchFGStockComposite() {
-  async function lastClose(symbol) {
-    try {
-      const url = `https://r.jina.ai/http://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
-      const t = await (await fetch(url)).text();
-      const j = JSON.parse(t);
-      const arr = j?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
-      const v = arr.filter(x => Number.isFinite(x)).slice(-1)[0];
-      return Number(v);
-    } catch {
-      return null;
-    }
-  }
-  const [vix, pcr] = await Promise.all([
-    lastClose('^VIX'),
-    lastClose('^CPC')
-  ]);
-  if (!Number.isFinite(vix) && !Number.isFinite(pcr)) return null;
-  const norm = (x, min, max) =>
-    Math.max(0, Math.min(100, 100 * (1 - (x - min) / (max - min))));
-  const vixScore = Number.isFinite(vix) ? norm(vix, 12, 40) : null;
-  const pcrScore = Number.isFinite(pcr) ? norm(pcr, 0.7, 1.3) : null;
-  const parts = [vixScore, pcrScore].filter(n => Number.isFinite(n));
-  const val = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
-  return { value: val, source: 'stock composite' };
+function renderValuation(left, v){
+const m=left.querySelector('[data-metrics]');
+if(!m) return;
+m.innerHTML='';
+const add=(k,val)=>{
+if(val==null) return;
+const d=document.createElement('div');
+d.style.display='flex';
+d.style.justifyContent='space-between';
+d.innerHTML=`<span>${k}</span><b>${typeof val==='number'? Number(val.toFixed(2)) : val}</b>`;
+m.appendChild(d);
+};
+add('MCap', v.mcap);
+add('P/E', v.pe);
+add('P/S', v.ps);
+add('EV/S', v.evs);
 }
 
+
+WATCHLIST.forEach(makeRow);
 </script>
 </body>
 </html>
