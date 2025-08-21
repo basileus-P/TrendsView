@@ -131,6 +131,10 @@ fngSrc.textContent=src||'';
     row.dataset.score = sig?.score ?? 0;
     resortBySignal();
 });
+// Value targets (Analyst + Model)
+fetchValueTargets(stock.ticker).then(t => {
+  renderValueTargets(left, t);
+});
 
     state.rows.push({ el:row, data:stock, tFrame, tvbox });
   }
@@ -191,6 +195,91 @@ async function fetchFearGreed(){
   return null;
 }
 
+// --- Value Targets (Analyst + Model) ---
+
+async function fetchValueTargets(ticker){
+  try{
+    // 1) Current price & shares
+    const [qRes, profRes, kmRes, ptRes] = await Promise.all([
+      fetch(`${API_FMP}/quote/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`),                 // price
+      fetch(`${API_FMP}/profile/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`),               // shares, sector
+      fetch(`${API_FMP}/key-metrics-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`),       // EPS, Revenue/Share
+      fetch(`${API_FMP}/price-target?symbol=${encodeURIComponent(ticker)}&apikey=${FMP_KEY}`)    // analyst targets
+    ]);
+
+    if(!qRes.ok || !profRes.ok || !kmRes.ok) return null;
+
+    const qArr = await qRes.json();
+    const pArr = await profRes.json();
+    const kArr = await kmRes.json();
+    const ptArr = ptRes.ok ? await ptRes.json() : [];
+
+    const quote = Array.isArray(qArr) && qArr[0] ? qArr[0] : {};
+    const prof  = Array.isArray(pArr) && pArr[0] ? pArr[0] : {};
+    const km    = Array.isArray(kArr) && kArr[0] ? kArr[0] : {};
+    const pt    = Array.isArray(ptArr) && ptArr[0] ? ptArr[0] : {};
+
+    const price = Number(quote.price ?? quote.previousClose ?? 0);
+
+    // Analyst values (fallback gracefully if fields missing)
+    const analystMean   = toNum(pt?.targetMean ?? pt?.targetConsensus);
+    const analystMedian = toNum(pt?.targetMedian ?? pt?.targetLow && pt?.targetHigh
+                                ? (pt.targetLow + pt.targetHigh)/2 : null);
+
+    // Model fair value (simple, robust composite)
+    // We blend a P/E-based fair value with a P/S-based fair value.
+    // Anchors chosen to generalize across sectors; easy to tweak later.
+    const epsTTM  = toNum(km?.netIncomePerShareTTM ?? km?.epsTTM ?? km?.epsDilutedTTM);
+    const rpsTTM  = toNum(km?.revenuePerShareTTM);
+    const peAnchor = 20;        // growth default anchor
+    const psAnchor = 3;         // generalized anchor for most growth/tech names
+
+    const fairPE = (epsTTM>0) ? epsTTM * peAnchor : null;
+    const fairPS = (rpsTTM>0) ? rpsTTM * psAnchor : null;
+
+    let modelFair = null;
+    if (fairPE!=null && fairPS!=null) modelFair = 0.6*fairPE + 0.4*fairPS;
+    else if (fairPE!=null)            modelFair = fairPE;
+    else if (fairPS!=null)            modelFair = fairPS;
+
+    return { price, analystMean, analystMedian, modelFair };
+  }catch(e){
+    console.error('valueTargets error', e);
+    return null;
+  }
+
+  function toNum(x){ const n=Number(x); return Number.isFinite(n)?n:null; }
+}
+
+function renderValueTargets(left, t){
+  // Remove old block if exists
+  const old = left.querySelector('.targets'); if(old) old.remove();
+  const box = document.createElement('div');
+  box.className = 'targets';
+  box.style.marginTop = '6px';
+  box.style.fontSize = '12px';
+
+  if(!t){ box.innerHTML = `<b>Value Targets</b> — n/a`; left.appendChild(box); return; }
+
+  const fmt = v => (v==null ? '—' : (v<10 ? v.toFixed(2) : v.toFixed(1)));
+  const tag = (label, val) => `<span class="chip" style="background:#37474f">${label} ${fmt(val)}</span>`;
+
+  // Simple verdict vs our model
+  let verdict = '';
+  if (t.modelFair!=null && t.price>0){
+    const diff = (t.modelFair / t.price - 1) * 100;
+    verdict = diff>10 ? `<span class="chip" style="background:#2e7d32">Undervalued +${diff.toFixed(0)}%</span>`
+           : diff<-10 ? `<span class="chip" style="background:#b23c17">Overpriced ${diff.toFixed(0)}%</span>`
+                      : `<span class="chip" style="background:#8d6e63">Near Fair ${diff.toFixed(0)}%</span>`;
+  }
+
+  box.innerHTML = `<b>Value Targets</b> 
+    ${tag('Analyst Mean', t.analystMean)} 
+    ${tag('Analyst Median', t.analystMedian)} 
+    ${tag('Model Fair', t.modelFair)} 
+    ${verdict}`;
+  left.appendChild(box);
+}
 
 
 async function fetchValuation(ticker){
