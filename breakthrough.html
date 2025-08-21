@@ -166,27 +166,38 @@ async function fetchFearGreed(){
 
 
 async function fetchValuation(ticker){
-try{
-const profUrl = `${API_FMP}/profile/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
-const kmUrl = `${API_FMP}/key-metrics-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
-const [profRes, kmRes] = await Promise.all([fetch(profUrl), fetch(kmUrl)]);
-if(!profRes.ok || !kmRes.ok) return null;
+  try {
+    const profUrl = `${API_FMP}/profile/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
+    const kmUrl   = `${API_FMP}/key-metrics-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
+    const ratioUrl= `${API_FMP}/ratios-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`;
 
+    const [profRes, kmRes, ratioRes] = await Promise.all([
+      fetch(profUrl), fetch(kmUrl), fetch(ratioUrl)
+    ]);
 
-const prof = await profRes.json();
-const km = await kmRes.json();
-const p0 = Array.isArray(prof) && prof[0] ? prof[0] : {};
-const k0 = Array.isArray(km) && km[0] ? km[0] : {};
+    if(!profRes.ok || !kmRes.ok || !ratioRes.ok) return null;
 
+    const prof = await profRes.json();
+    const km   = await kmRes.json();
+    const ratio= await ratioRes.json();
 
-const mcap = p0.mktCap ? `$${Math.round(p0.mktCap/1e9)}B` : null;
-const pe = k0.peTTM ?? null;
-const ps = k0.priceToSalesTTM ?? null;
-const evs = k0.enterpriseValueOverRevenueTTM ?? null;
+    const p0 = Array.isArray(prof) && prof[0] ? prof[0] : {};
+    const k0 = Array.isArray(km)   && km[0]   ? km[0]   : {};
+    const r0 = Array.isArray(ratio)&& ratio[0]? ratio[0]: {};
 
+    const mcap = p0.mktCap ? `$${Math.round(p0.mktCap/1e9)}B` : null;
+    const pe   = k0.peTTM ?? r0.peRatioTTM ?? null;
+    const ps   = k0.priceToSalesTTM ?? r0.priceToSalesRatioTTM ?? null;
+    const evs  = k0.enterpriseValueOverRevenueTTM ?? null;
+    const eve  = r0.enterpriseValueOverEBITDATTM ?? null;
+    const de   = r0.debtEquityRatioTTM ?? null;
+    const roe  = r0.returnOnEquityTTM ?? null;
 
-return { mcap, pe, ps, evs };
-}catch(e){ console.error("Valuation fetch error", e); return null; }
+    return { mcap, pe, ps, evs, eve, de, roe };
+  } catch(e){
+    console.error("Valuation fetch error", e);
+    return null;
+  }
 }
 
 
@@ -206,6 +217,9 @@ add('MCap', v.mcap);
 add('P/E', v.pe);
 add('P/S', v.ps);
 add('EV/S', v.evs);
+add('EV/EBITDA', v.eve);
+add('Debt/Equity', v.de);
+add('ROE %', v.roe);
 }
 
 
