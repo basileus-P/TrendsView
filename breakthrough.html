@@ -250,28 +250,6 @@ add('Debt/Equity', v.de);
 add('ROE %', v.roe);
 }
 
-  function renderSignals(left, v, quote, trend){
-  const box = document.createElement('div');
-  box.style.marginTop = "5px";
-  box.innerHTML = `<b>Signals</b>`;
-  
-  const sigs = [
-    volSurge(quote),
-    momentum(quote),
-    breakout(quote),
-    trendSpike(trend),
-  ].filter(Boolean);
-
-  sigs.forEach(s=>{
-    const d = document.createElement('div');
-    d.textContent = s;
-    d.style.color = "lime";
-    box.appendChild(d);
-  });
-
-  left.appendChild(box);
-}
-
 
 WATCHLIST.forEach(makeRow);
   // ---------- Breakthrough signal engine ----------
@@ -314,25 +292,39 @@ async function fetchSignals(ticker){
 }
 
 function renderSignals(left, sig){
-  const old = left.querySelector('.sig'); if(old) old.remove();
-  const box = document.createElement('div'); box.className='sig'; box.style.marginTop='6px'; box.style.fontSize='12px';
-  const chip = (txt,cls='') => `<span class="chip ${cls}" style="background:#2e7d32">${txt}</span>`;
-  const chips=[];
-  if(!sig){ left.appendChild(box); return; }
-  if(sig.volScore>=0.7) chips.push(chip('🔥 Vol Surge'));
-  if(sig.momScore>=0.7) chips.push(chip('🚀 Momentum'));
-  if(sig.brkScore>=0.9) chips.push(chip('📈 Breakout'));
-  chips.push(chip(`Signal ${sig.score}`,'warn'));
-  box.innerHTML = `<b>Signals</b> ${chips.join(' ')}`;
-  left.appendChild(box);
+const old = left.querySelector('.sig');
+if(old) old.remove();
+
+
+const box = document.createElement('div');
+box.className = 'sig';
+box.style.marginTop = '6px';
+box.style.fontSize = '12px';
+
+
+const chip = (txt,cls='') => `<span class="chip ${cls}" style="background:#2e7d32">${txt}</span>`;
+const chips=[];
+
+
+if(!sig){ left.appendChild(box); return; }
+if(sig.volScore>=0.7) chips.push(chip('🔥 Vol Surge'));
+if(sig.momScore>=0.7) chips.push(chip('🚀 Momentum'));
+if(sig.brkScore>=0.9) chips.push(chip('📈 Breakout'));
+
+
+chips.push(chip(`Signal ${sig.score}`,'warn'));
+
+
+box.innerHTML = `<b>Signals</b> ${chips.join(' ')}`;
+left.appendChild(box);
 }
+
 
 function resortBySignal(){
-  const rows=[...document.getElementById('table').children];
-  rows.sort((a,b)=> (Number(b.dataset.score||0) - Number(a.dataset.score||0)) );
-  rows.forEach(r=>document.getElementById('table').appendChild(r));
+const rows=[...document.getElementById('table').children];
+rows.sort((a,b)=> (Number(b.dataset.score||0) - Number(a.dataset.score||0)) );
+rows.forEach(r=>document.getElementById('table').appendChild(r));
 }
-
 </script>
 </body>
 </html>
