@@ -60,6 +60,27 @@ const fngVal=document.getElementById('fngVal');
 const needle=document.getElementById('needle');
 const fngSrc=document.getElementById('fngSrc');
 
+  const volSurge = (quote) => {
+  if(!quote || !quote.volume || !quote.avgVolume) return null;
+  return (quote.volume / quote.avgVolume > 2) ? "🔥 Volume Surge" : null;
+};
+const momentum = (quote) => {
+  if(!quote || !quote.price || !quote.ma20) return null;
+  const pct = ((quote.price - quote.ma20) / quote.ma20) * 100;
+  return pct > 10 ? `🚀 Momentum +${pct.toFixed(1)}%` : null;
+};
+  const breakout = (quote) => {
+  if(!quote || !quote.price || !quote.high30d) return null;
+  return (quote.price >= quote.high30d) ? "📈 30d Breakout" : null;
+};
+  const trendSpike = (trendData) => {
+  if(!trendData || trendData.length < 7) return null;
+  const last = trendData.slice(-7).reduce((a,b)=>a+b,0)/7;
+  const base = trendData.slice(0,7).reduce((a,b)=>a+b,0)/7;
+  return (last > base*3) ? "🔥 Trend Spike" : null;
+};
+
+
 
 function setFNG(v,src){
 needle.style.transform=`rotate(${ -90 + (v*1.8) }deg)`;
@@ -220,6 +241,28 @@ add('EV/S', v.evs);
 add('EV/EBITDA', v.eve);
 add('Debt/Equity', v.de);
 add('ROE %', v.roe);
+}
+
+  function renderSignals(left, v, quote, trend){
+  const box = document.createElement('div');
+  box.style.marginTop = "5px";
+  box.innerHTML = `<b>Signals</b>`;
+  
+  const sigs = [
+    volSurge(quote),
+    momentum(quote),
+    breakout(quote),
+    trendSpike(trend),
+  ].filter(Boolean);
+
+  sigs.forEach(s=>{
+    const d = document.createElement('div');
+    d.textContent = s;
+    d.style.color = "lime";
+    box.appendChild(d);
+  });
+
+  left.appendChild(box);
 }
 
 
