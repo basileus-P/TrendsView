@@ -55,6 +55,9 @@ const WATCHLIST=[
 
 const state = { rows:[], range:'12M', geo:'US', trendTime:'today 1-m' };
 const table = document.getElementById('table');
+// Defaults if not already defined:
+const API_FMP = typeof API_FMP !== 'undefined' ? API_FMP : 'https://financialmodelingprep.com/api/v3';
+const FMP_KEY = typeof FMP_KEY !== 'undefined' ? FMP_KEY : 'CnZ2WdgFKH9JQxlqxKNvBg8rHbe9wvnN'; // replace 'demo' with your key
 
 const fngVal=document.getElementById('fngVal');
 const needle=document.getElementById('needle');
@@ -124,6 +127,12 @@ fngSrc.textContent=src||'';
 
     lazyMountMiniChart(tvbox, `${stock.exchange}:${stock.ticker}`);
     fetchValuation(stock.ticker).then(v=>{ if(v) renderValuation(left, v); else left.querySelector('[data-metrics]').innerHTML='<div>n/a</div>'; });
+// Fetch signals and render Breakthrough Strength
+    fetchSignals(stock.ticker).then(sig => {
+    renderSignals(left, sig);
+    row.dataset.score = sig?.score ?? 0;
+    resortBySignal();
+});
 
     state.rows.push({ el:row, data:stock, tFrame, tvbox });
   }
@@ -267,6 +276,65 @@ add('ROE %', v.roe);
 
 
 WATCHLIST.forEach(makeRow);
+  // ---------- Breakthrough signal engine ----------
+async function fetchSignals(ticker){
+  try{
+    // 1) Quote for price/volume
+    const qRes = await fetch(`${API_FMP}/quote/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`);
+    if(!qRes.ok) return null;
+    const qArr = await qRes.json();
+    const q = Array.isArray(qArr) && qArr[0] ? qArr[0] : {};
+
+    // 2) Recent history for MA20, 30d high, 5d change
+    const hRes = await fetch(`${API_FMP}/historical-price-full/${encodeURIComponent(ticker)}?timeseries=60&serietype=line&apikey=${FMP_KEY}`);
+    if(!hRes.ok) return null;
+    const h = await hRes.json();
+    const closes = (h?.historical||[]).map(d=>Number(d.close)).filter(Number.isFinite);
+
+    const price = Number(q.price ?? q.previousClose ?? closes.at(-1) ?? 0);
+    const volume = Number(q.volume ?? 0);
+    const avgVolume = Number(q.avgVolume ?? q.avgVolume10days ?? q.avgVolume2weeks ?? 0);
+
+    const last20 = closes.slice(-20);
+    const ma20 = last20.length ? last20.reduce((a,b)=>a+b,0)/last20.length : null;
+    const high30d = closes.slice(-30).reduce((m,v)=>Math.max(m,v), -Infinity);
+    const fiveAgo = closes.slice(-6, -5)[0];
+    const chg5d = (Number.isFinite(fiveAgo) && fiveAgo>0) ? (price/fiveAgo - 1) : null;
+
+    // ---- Scores 0..1 ----
+    const clamp=x=>Math.max(0,Math.min(1,x));
+    const volScore = (volume>0 && avgVolume>0) ? clamp((volume/avgVolume - 1)/1) : 0;   // 2x avg -> 1
+    const momScore = (ma20? clamp((price/ma20 - 1)/0.10): 0);                            // +10% over MA20 -> 1
+    const brkScore = (Number.isFinite(high30d)? (price>=high30d?1: clamp((price-(high30d*0.97))/(high30d*0.03))):0); // within 3% of 30d high
+
+    // ---- Combine (weights) into 0..100
+    const score01 = 0.35*volScore + 0.35*momScore + 0.30*brkScore;
+    const score = Math.round(score01*100);
+
+    return { price, volume, avgVolume, ma20, high30d, chg5d, volScore, momScore, brkScore, score };
+  }catch(e){ console.error('signals error', e); return null; }
+}
+
+function renderSignals(left, sig){
+  const old = left.querySelector('.sig'); if(old) old.remove();
+  const box = document.createElement('div'); box.className='sig'; box.style.marginTop='6px'; box.style.fontSize='12px';
+  const chip = (txt,cls='') => `<span class="chip ${cls}" style="background:#2e7d32">${txt}</span>`;
+  const chips=[];
+  if(!sig){ left.appendChild(box); return; }
+  if(sig.volScore>=0.7) chips.push(chip('🔥 Vol Surge'));
+  if(sig.momScore>=0.7) chips.push(chip('🚀 Momentum'));
+  if(sig.brkScore>=0.9) chips.push(chip('📈 Breakout'));
+  chips.push(chip(`Signal ${sig.score}`,'warn'));
+  box.innerHTML = `<b>Signals</b> ${chips.join(' ')}`;
+  left.appendChild(box);
+}
+
+function resortBySignal(){
+  const rows=[...document.getElementById('table').children];
+  rows.sort((a,b)=> (Number(b.dataset.score||0) - Number(a.dataset.score||0)) );
+  rows.forEach(r=>document.getElementById('table').appendChild(r));
+}
+
 </script>
 </body>
 </html>
