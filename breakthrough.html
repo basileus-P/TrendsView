@@ -161,6 +161,7 @@ async function fetchFearGreed(){
 
 
 async function fetchValuation(ticker){
+  await new Promise(r => setTimeout(r, 150 + Math.random()*200));
   // 1) Quote first (reliable)
   try{
     const r = await fetch(`${API_BASE}api/yahoo/quote?symbol=${encodeURIComponent(ticker)}`);
